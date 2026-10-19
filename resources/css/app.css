@@ -1,0 +1,77 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../views/**/*.blade.php';
+
+@theme {
+    --font-sans: 'Instrument Sans', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+    /* Netral (condong ke hue teal, bukan biru) */
+    --color-canvas: #f2f4f1;
+    --color-surface: #fafbf9;
+    --color-line: #dbe1dc;
+    --color-ink: #16201e;
+    --color-ink-soft: #55645f;
+    --color-ink-faint: #8a9892;
+
+    /* Brand (satu-satunya aksen utama) */
+    --color-brand: #006059;
+    --color-brand-deep: #004540;
+    --color-brand-wash: #e1eeeb;
+
+    /* Aksen sekunder (hanya untuk data kedua di chart dan highlight kecil) */
+    --color-ochre: #c98a2b;
+    --color-ochre-wash: #f6ead4;
+
+    /* Status (semantik, satu warna per makna, tanpa duplikat) */
+    --color-wait: #a86a0c;
+    --color-wait-wash: #f8f1e5;
+    --color-process: #3b5a8c;
+    --color-process-wash: #edf2f8;
+    --color-done: #4b7d57;
+    --color-done-wash: #edf5f0;
+    --color-alert: #b03a22;
+    --color-alert-wash: #faece9;
+
+    /* Radius standard: 10-12px (rounded-xl) */
+    --radius-box: 0.75rem;
+}
+
+/* Form Controls Base Style */
+@layer base {
+    input:not([type='checkbox']):not([type='radio']):not([type='submit']):not([type='button']):not([type='file']):not([type='hidden']),
+    select,
+    textarea {
+        border-width: 1px;
+        border-style: solid;
+        border-color: var(--color-line);
+        background-color: var(--color-surface);
+        color: var(--color-ink);
+    }
+    input:focus, select:focus, textarea:focus {
+        border-color: var(--color-brand);
+        outline: none;
+    }
+}
+
+[x-cloak] {
+    display: none !important;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--color-line);
+    border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-faint);
+}
