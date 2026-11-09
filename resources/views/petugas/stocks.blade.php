@@ -122,8 +122,8 @@
 
     get submitNotes() {
         if (this.actionType === 'recount') {
-            const prefix = this.notes ? this.notes.trim() + ': ' : '';
-            return prefix + 'Hitung fisik ' + this.selectedItem.stock + ' -> ' + this.physicalCount;
+            // Selisih hitung fisik ditambahkan oleh server terhadap stok terkini.
+            return this.notes.trim() || 'Hasil hitung ulang fisik';
         }
         return this.notes.trim() || (this.actionType === 'in' ? 'Restock' : 'Barang rusak');
     },
@@ -168,7 +168,7 @@
     <!-- ============================================================== -->
     <div class="flex items-baseline justify-between pb-1">
         <div class="flex items-baseline gap-2.5">
-            <h1 class="text-base sm:text-lg font-bold text-ink leading-tight">Stok</h1>
+            <h1 class="text-3xl text-brand-deep leading-tight">Stok</h1>
             @if($totalNeedRestock > 0)
                 <span class="text-xs font-semibold tabular-nums {{ $habisCount > 0 ? 'text-alert' : 'text-wait' }}">
                     @if($menipisCount > 0 && $habisCount > 0)
@@ -198,7 +198,7 @@
                     <span class="w-2 h-2 rounded-full bg-alert"></span>
                     <span>Perlu Restock ({{ $needRestockItems->count() }})</span>
                 </h2>
-                <span class="text-[11px] text-ink-faint">Prioritas pengadaan barang</span>
+                <span class="text-2xs text-ink-faint">Prioritas pengadaan barang</span>
             </div>
 
             <div class="bg-surface rounded-xl border border-line divide-y divide-line">
@@ -236,25 +236,25 @@
             <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
                 <button type="button" 
                         @click="catFilter = 'semua'"
-                        :class="catFilter === 'semua' ? 'bg-brand-wash text-brand font-bold border border-line' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
+                        :class="catFilter === 'semua' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
                         class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
                     Semua
                 </button>
                 <button type="button" 
                         @click="catFilter = 'galon'"
-                        :class="catFilter === 'galon' ? 'bg-brand-wash text-brand font-bold border border-line' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
+                        :class="catFilter === 'galon' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
                         class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
                     Galon
                 </button>
                 <button type="button" 
                         @click="catFilter = 'makanan'"
-                        :class="catFilter === 'makanan' ? 'bg-brand-wash text-brand font-bold border border-line' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
+                        :class="catFilter === 'makanan' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
                         class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
                     Makanan
                 </button>
                 <button type="button" 
                         @click="catFilter = 'minuman'"
-                        :class="catFilter === 'minuman' ? 'bg-brand-wash text-brand font-bold border border-line' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
+                        :class="catFilter === 'minuman' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
                         class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
                     Minuman
                 </button>
@@ -334,9 +334,9 @@
             <div class="flex items-center justify-between pb-2 border-b border-line">
                 <div>
                     <h2 class="text-sm font-bold text-ink leading-snug">Riwayat Mutasi Stok</h2>
-                    <p class="text-[11px] text-ink-faint">Catatan masuk, keluar, dan penyesuaian terbaru</p>
+                    <p class="text-2xs text-ink-faint">Catatan masuk, keluar, dan penyesuaian terbaru</p>
                 </div>
-                <span class="text-[11px] font-medium text-ink-soft bg-canvas px-2.5 py-0.5 rounded-full border border-line">
+                <span class="text-2xs font-medium text-ink-soft bg-canvas px-2.5 py-0.5 rounded-full border border-line">
                     {{ count($groupedLogs) }} Aktivitas
                 </span>
             </div>
@@ -349,13 +349,13 @@
                             <div class="flex items-center gap-1.5 flex-wrap">
                                 <span class="font-bold text-ink">{{ $log->catalogItem->name ?? 'Item' }}</span>
                                 @if($entry['count'] > 1)
-                                    <span class="px-1.5 py-0.2 text-[10px] font-bold bg-canvas text-ink-soft rounded border border-line tabular-nums">
+                                    <span class="px-1.5 py-0.2 text-2xs font-bold bg-canvas text-ink-soft rounded border border-line tabular-nums">
                                         x{{ $entry['count'] }}
                                     </span>
                                 @endif
                             </div>
-                            <p class="text-[11px] text-ink-soft leading-snug">{{ $log->notes ?? '-' }}</p>
-                            <p class="text-[10px] text-ink-faint">
+                            <p class="text-2xs text-ink-soft leading-snug">{{ $log->notes ?? '-' }}</p>
+                            <p class="text-2xs text-ink-faint">
                                 <span>{{ $log->user->name ?? 'Sistem' }}</span>
                                 <span class="mx-1">&bull;</span>
                                 <span>{{ $log->created_at ? $log->created_at->diffForHumans() : '-' }}</span>
@@ -364,11 +364,11 @@
 
                         <div class="text-right shrink-0">
                             @if($log->type === 'in')
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-done-wash text-done border border-line tabular-nums">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-2xs font-bold bg-done-wash text-done border border-line tabular-nums">
                                     +{{ $log->quantity * $entry['count'] }}
                                 </span>
                             @else
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-alert-wash text-alert border border-line tabular-nums">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-2xs font-bold bg-alert-wash text-alert border border-line tabular-nums">
                                     -{{ $log->quantity * $entry['count'] }}
                                 </span>
                             @endif
@@ -417,6 +417,7 @@
                     <input type="hidden" name="type" :value="submitType">
                     <input type="hidden" name="quantity" :value="submitQuantity">
                     <input type="hidden" name="notes" :value="submitNotes">
+                    <input type="hidden" name="physical_count" :value="actionType === 'recount' ? physicalCount : ''">
 
                     <!-- Field Input: Jika Masuk atau Rusak -->
                     <template x-if="actionType === 'in' || actionType === 'out'">
@@ -456,7 +457,7 @@
                                        class="w-full text-xs rounded-xl border border-line focus:border-brand focus:ring-1 focus:ring-brand min-h-[44px] px-3 bg-surface text-ink">
                                 
                                 <!-- Preset Keterangan -->
-                                <div class="flex items-center gap-1.5 mt-2 flex-wrap text-[11px]">
+                                <div class="flex items-center gap-1.5 mt-2 flex-wrap text-2xs">
                                     <template x-if="actionType === 'in'">
                                         <div class="flex gap-1.5 flex-wrap">
                                             <button type="button" @click="notes = 'Restock kiriman agen'" class="px-2.5 py-1 bg-canvas hover:bg-surface border border-line rounded-lg text-ink-soft">Restock agen</button>
@@ -487,7 +488,7 @@
                                        max="1000" 
                                        required
                                        class="w-full text-base font-bold font-mono text-ink rounded-xl border border-line focus:border-brand focus:ring-1 focus:ring-brand min-h-[44px] px-3 tabular-nums bg-surface">
-                                <p class="text-[11px] text-ink-faint mt-1">
+                                <p class="text-2xs text-ink-faint mt-1">
                                     Masukkan jumlah barang nyata yang ada di tempat saat ini.
                                 </p>
                             </div>
@@ -513,10 +514,10 @@
                                   :class="diff > 0 ? 'text-done' : (diff < 0 ? 'text-alert' : 'text-ink-faint')" 
                                   x-text="'(' + diffText + ' ' + (selectedItem ? selectedItem.unit : '') + ')'"></span>
                         </div>
-                        <div x-show="afterStock < 0" class="text-[11px] text-alert font-semibold pt-1">
+                        <div x-show="afterStock < 0" class="text-2xs text-alert font-semibold pt-1">
                             Stok akhir tidak boleh kurang dari 0.
                         </div>
-                        <div x-show="actionType === 'recount' && diff === 0" class="text-[11px] text-wait font-medium pt-1">
+                        <div x-show="actionType === 'recount' && diff === 0" class="text-2xs text-wait font-medium pt-1">
                             Jumlah fisik sama dengan stok sistem saat ini (tidak ada perubahan).
                         </div>
                     </div>

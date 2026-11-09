@@ -4,55 +4,190 @@
 @source '../../storage/framework/views/*.php';
 @source '../views/**/*.blade.php';
 
+/*
+ * Sistem desain Kos Tiana Putra.
+ * Semua pasangan warna teks/latar di bawah sudah diperiksa kontrasnya (WCAG AA >= 4.5:1).
+ * Tema per peran: ganti --color-brand* lewat atribut data-role pada <html> (lihat bagian "Tema peran").
+ */
 @theme {
-    --font-sans: 'Instrument Sans', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
-    /* Netral (condong ke hue teal, bukan biru) */
-    --color-canvas: #f2f4f1;
-    --color-surface: #fafbf9;
-    --color-line: #dbe1dc;
-    --color-ink: #16201e;
-    --color-ink-soft: #55645f;
-    --color-ink-faint: #8a9892;
+    /* Skala tipografi: tidak ada teks di bawah 12px, isi utama 13-15px agar nyaman dibaca */
+    --font-display: 'Bricolage Grotesque', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+    /* Hanya bobot 400-700 yang diunduh; extrabold dipetakan ke 700 agar tidak ada berkas font tambahan */
+    --font-weight-extrabold: 700;
 
-    /* Brand (satu-satunya aksen utama) */
+    --radius-xl: 1rem;
+    --radius-2xl: 1.25rem;
+    --radius-3xl: 1.75rem;
+
+    --text-2xs: 0.75rem;
+    --text-2xs--line-height: 1.0625rem;
+    --text-xs: 0.8125rem;
+    --text-xs--line-height: 1.2rem;
+    --text-sm: 0.9375rem;
+    --text-sm--line-height: 1.4rem;
+    --text-base: 1rem;
+    --text-base--line-height: 1.5rem;
+
+    /* Netral hangat (kertas), bukan abu-abu dingin */
+    --color-canvas: #f3f1ea;
+    --color-surface: #fffefb;
+    --color-line: #dedbd0;
+    --color-ink: #17211f;
+    --color-ink-soft: #46544f;
+    --color-ink-faint: #5f6c67;
+
+    /* Brand (diganti per peran) */
     --color-brand: #006059;
     --color-brand-deep: #004540;
-    --color-brand-wash: #e1eeeb;
+    --color-brand-wash: #dcebe7;
 
-    /* Aksen sekunder (hanya untuk data kedua di chart dan highlight kecil) */
+    /* Aksen hangat: untuk sorotan, angka kunci, dan ilustrasi. Gunakan ochre-ink untuk teks. */
     --color-ochre: #c98a2b;
-    --color-ochre-wash: #f6ead4;
+    --color-ochre-ink: #85560a;
+    --color-ochre-wash: #f7ecd6;
 
-    /* Status (semantik, satu warna per makna, tanpa duplikat) */
-    --color-wait: #a86a0c;
-    --color-wait-wash: #f8f1e5;
-    --color-process: #3b5a8c;
-    --color-process-wash: #edf2f8;
-    --color-done: #4b7d57;
-    --color-done-wash: #edf5f0;
-    --color-alert: #b03a22;
-    --color-alert-wash: #faece9;
+    /* Status (semantik, satu warna per makna) */
+    --color-wait: #8a5600;
+    --color-wait-wash: #f8efdc;
+    --color-process: #2f5486;
+    --color-process-wash: #e8eef7;
+    --color-done: #3a6b46;
+    --color-done-wash: #e6f1e9;
+    --color-alert: #a3341c;
+    --color-alert-wash: #faeae6;
 
-    /* Radius standard: 10-12px (rounded-xl) */
+    --color-focus: #1a5fd0;
+
+    /* Kedalaman berlapis: kartu terasa terangkat, bukan datar */
+    --shadow-2xs: 0 1px 1px rgb(23 33 31 / 0.05);
+    --shadow-xs: 0 1px 2px rgb(23 33 31 / 0.07), 0 1px 1px rgb(23 33 31 / 0.04);
+    --shadow-sm: 0 2px 6px rgb(23 33 31 / 0.08), 0 1px 2px rgb(23 33 31 / 0.05);
+    --shadow-md: 0 8px 20px -4px rgb(23 33 31 / 0.12), 0 2px 6px rgb(23 33 31 / 0.06);
+    --shadow-lg: 0 16px 32px -8px rgb(23 33 31 / 0.16), 0 4px 10px rgb(23 33 31 / 0.06);
+    --shadow-xl: 0 24px 48px -12px rgb(23 33 31 / 0.22), 0 6px 14px rgb(23 33 31 / 0.08);
+
     --radius-box: 0.75rem;
 }
 
-/* Form Controls Base Style */
+/* ------------------------------------------------------------------ */
+/* Tema peran: petugas (warkop) memakai cokelat kopi agar langsung      */
+/* terasa "mode kerja" berbeda dari panel pengelola dan penghuni.      */
+/* ------------------------------------------------------------------ */
+html[data-role='petugas'] {
+    --color-brand: #7a4b1f;
+    --color-brand-deep: #5e3714;
+    --color-brand-wash: #f3e8dc;
+}
+
 @layer base {
+    html {
+        -webkit-text-size-adjust: 100%;
+        scroll-padding-top: 5rem;
+    }
+
+    body {
+        background-color: var(--color-canvas);
+        background-image:
+            radial-gradient(60rem 28rem at 100% -10%, color-mix(in srgb, var(--color-brand) 7%, transparent), transparent 70%),
+            radial-gradient(40rem 24rem at -10% 0%, color-mix(in srgb, var(--color-ochre) 9%, transparent), transparent 70%);
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+        line-height: 1.5;
+    }
+
+    ::selection {
+        background: var(--color-brand-wash);
+        color: var(--color-brand-deep);
+    }
+
+    /* Form */
     input:not([type='checkbox']):not([type='radio']):not([type='submit']):not([type='button']):not([type='file']):not([type='hidden']),
     select,
     textarea {
         border-width: 1px;
         border-style: solid;
-        border-color: var(--color-line);
+        border-color: #b9b5a6;
         background-color: var(--color-surface);
         color: var(--color-ink);
     }
-    input:focus, select:focus, textarea:focus {
+    input::placeholder,
+    textarea::placeholder {
+        color: var(--color-ink-faint);
+        opacity: 1;
+    }
+    input:focus,
+    select:focus,
+    textarea:focus {
         border-color: var(--color-brand);
         outline: none;
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 22%, transparent);
+    }
+
+    /* Fokus keyboard yang selalu terlihat (aksesibilitas) */
+    :focus-visible {
+        outline: 3px solid var(--color-focus);
+        outline-offset: 2px;
+        border-radius: 0.375rem;
+    }
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+        outline: none;
+    }
+
+    button,
+    [role='button'],
+    summary,
+    a {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    button:not(:disabled),
+    [role='button'] {
+        cursor: pointer;
+    }
+    button:disabled {
+        cursor: not-allowed;
+    }
+}
+
+/* Mencegah iOS memperbesar halaman saat kolom isian difokuskan (butuh >= 16px) */
+@media (max-width: 767px) {
+    input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']),
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* Target sentuh minimal 44px pada perangkat layar sentuh */
+@media (pointer: coarse) {
+    button,
+    [role='button'],
+    select,
+    summary,
+    input:not([type='checkbox']):not([type='radio']):not([type='hidden']) {
+        min-height: 44px;
+    }
+    input[type='checkbox'],
+    input[type='radio'] {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+}
+
+/* Hormati preferensi pengguna yang sensitif terhadap gerakan */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
     }
 }
 
@@ -60,18 +195,365 @@
     display: none !important;
 }
 
-/* Custom Scrollbar */
+/* Tautan lompat ke konten untuk pengguna keyboard / pembaca layar */
+.skip-link {
+    position: absolute;
+    left: 1rem;
+    top: -4rem;
+    z-index: 100;
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    background: var(--color-brand);
+    color: #fff;
+    font-weight: 600;
+    transition: top 0.15s;
+}
+.skip-link:focus {
+    top: 1rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Komponen kecil yang dipakai bersama                                  */
+/* ------------------------------------------------------------------ */
+
+/* Kartu statistik dengan penanda warna di tepi atas */
+.stat-card {
+    position: relative;
+    overflow: hidden;
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: 1rem;
+    box-shadow: var(--shadow-sm);
+}
+.stat-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 4px;
+    background: var(--stat-accent, var(--color-brand));
+}
+.stat-card[data-tone='brand'] { --stat-accent: var(--color-brand); }
+.stat-card[data-tone='ochre'] { --stat-accent: var(--color-ochre); }
+.stat-card[data-tone='process'] { --stat-accent: var(--color-process); }
+.stat-card[data-tone='alert'] { --stat-accent: var(--color-alert); }
+.stat-card[data-tone='done'] { --stat-accent: var(--color-done); }
+
+/* Ubin aksi cepat (penghuni): besar, jelas, mudah ditekan dengan satu tangan */
+.action-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    min-height: 5.5rem;
+    padding: 0.875rem;
+    border-radius: 1rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-xs);
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+.action-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-brand);
+}
+.action-tile:active {
+    transform: translateY(0);
+}
+
+/* Navigasi bawah (mobile): ikon dalam kapsul yang menyala saat aktif, target sentuh besar */
+.bn-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.125rem;
+    min-height: 3.75rem;
+    padding: 0.375rem 0;
+    color: var(--color-ink-soft);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 600;
+    transition: color 0.15s;
+}
+.bn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.5rem;
+    height: 2rem;
+    border-radius: 9999px;
+    transition: background-color 0.15s;
+}
+.bn-link:active .bn-icon {
+    background: var(--color-brand-wash);
+}
+.bn-link[aria-current='page'] {
+    color: var(--color-brand);
+    font-weight: 700;
+}
+.bn-link[aria-current='page'] .bn-icon {
+    background: var(--color-brand-wash);
+}
+
+/* Tabel yang berubah menjadi daftar kartu di layar sempit. Isi atribut data-label pada <td>. */
+@media (max-width: 767px) {
+    .table-stack,
+    .table-stack tbody,
+    .table-stack tr,
+    .table-stack td {
+        display: block;
+        width: 100%;
+    }
+    .table-stack thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+    }
+    .table-stack tr {
+        padding: 1rem;
+        border-bottom: 1px solid var(--color-line);
+    }
+    .table-stack tr:last-child {
+        border-bottom: 0;
+    }
+    .table-stack td {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 0.375rem 0 !important;
+        border: 0 !important;
+        text-align: right !important;
+        white-space: normal !important;
+    }
+    .table-stack td .cell-value {
+        flex: 1 1 auto;
+        min-width: 0;
+        text-align: right;
+    }
+    .table-stack td .cell-value > * {
+        margin-left: auto;
+    }
+    .table-stack td[data-label]::before {
+        content: attr(data-label);
+        flex: 0 0 auto;
+        max-width: 38%;
+        text-align: left;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--color-ink-soft);
+    }
+    .table-stack td[data-label=''] {
+        justify-content: flex-start;
+        text-align: left !important;
+    }
+    .table-stack td[data-label='']::before {
+        content: none;
+    }
+    .table-stack td[data-primary] {
+        display: block;
+        text-align: left !important;
+        padding-bottom: 0.625rem !important;
+    }
+    .table-stack td[data-primary]::before {
+        content: none;
+    }
+    .table-stack td[data-actions] {
+        justify-content: flex-end;
+        padding-top: 0.75rem !important;
+    }
+    .table-stack td[data-actions]::before {
+        content: none;
+    }
+}
+
+/* Scrollbar */
 ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
 }
 ::-webkit-scrollbar-track {
     background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-    background: var(--color-line);
+    background: #c5c1b3;
     border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
     background: var(--color-ink-faint);
+}
+
+/* ================================================================== */
+/* BAHASA VISUAL V2: berlaku seragam untuk semua peran                  */
+/* ================================================================== */
+
+/* Judul memakai font display yang berkarakter; isi tetap font sans yang netral */
+main h1,
+main h2,
+main h3,
+.font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+}
+main h1 {
+    font-weight: 800;
+    line-height: 1.15;
+}
+@media (max-width: 767px) {
+    main h1 {
+        font-size: 1.625rem;
+    }
+}
+
+/* Kartu: sudut lebih bulat, tepi halus, bayangan berlapis */
+.rounded-2xl.border.border-line,
+.rounded-xl.border.border-line.bg-surface {
+    border-color: color-mix(in srgb, var(--color-line) 70%, white);
+}
+.bg-surface.rounded-2xl.border {
+    box-shadow: var(--shadow-sm);
+}
+
+/* Pita judul halaman (dirender layout pengelola otomatis dari @section page_title) */
+.page-band {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1.75rem;
+    padding: 1.25rem 1.5rem;
+    background:
+        radial-gradient(18rem 10rem at 100% 0%, color-mix(in srgb, var(--color-ochre) 22%, transparent), transparent 70%),
+        linear-gradient(120deg, var(--color-brand-wash), color-mix(in srgb, var(--color-brand-wash) 40%, var(--color-surface)));
+    border: 1px solid color-mix(in srgb, var(--color-brand) 16%, transparent);
+    box-shadow: var(--shadow-xs);
+}
+.page-band::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(color-mix(in srgb, var(--color-brand) 14%, transparent) 1px, transparent 1.2px);
+    background-size: 14px 14px;
+    mask-image: linear-gradient(90deg, transparent 40%, #000 100%);
+    -webkit-mask-image: linear-gradient(90deg, transparent 40%, #000 100%);
+    pointer-events: none;
+}
+.page-band > * {
+    position: relative;
+}
+
+/* Tombol utama: gradasi + sorot tipis + angkat saat disorot */
+a.bg-brand,
+button.bg-brand {
+    background-image: linear-gradient(180deg, color-mix(in srgb, var(--color-brand) 86%, white), var(--color-brand));
+    box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.22),
+        0 6px 14px -6px color-mix(in srgb, var(--color-brand) 75%, transparent);
+    transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+}
+a.bg-brand:hover,
+button.bg-brand:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+}
+a.bg-brand:active,
+button.bg-brand:active:not(:disabled) {
+    transform: translateY(0);
+}
+button.bg-brand:disabled {
+    box-shadow: none;
+    filter: saturate(0.6);
+}
+
+/* Tabel desktop: kepala berwarna, baris menyorot dengan penanda di kiri */
+table thead tr {
+    background: color-mix(in srgb, var(--color-brand) 8%, var(--color-surface)) !important;
+}
+table thead th {
+    color: var(--color-brand-deep);
+    font-weight: 700;
+}
+table tbody tr {
+    transition: background-color 0.15s, box-shadow 0.15s;
+}
+table tbody tr:hover {
+    background: color-mix(in srgb, var(--color-brand) 4%, var(--color-surface));
+    box-shadow: inset 3px 0 0 var(--color-brand);
+}
+
+/* Kolom isian lebih lega dan jelas */
+input:not([type='checkbox']):not([type='radio']):not([type='submit']):not([type='button']):not([type='file']):not([type='hidden']),
+select,
+textarea {
+    border-radius: 0.875rem;
+}
+
+/* Menu samping gelap (pengelola) */
+.nav-dark {
+    background:
+        radial-gradient(20rem 14rem at 0% 0%, color-mix(in srgb, var(--color-brand) 60%, #000), transparent 70%),
+        linear-gradient(180deg, #003a35, #00231f);
+    color: #fff;
+}
+
+/* Bilah aplikasi berwarna (penghuni & petugas) */
+.app-bar {
+    background:
+        radial-gradient(22rem 9rem at 100% 0%, color-mix(in srgb, var(--color-ochre) 35%, transparent), transparent 70%),
+        linear-gradient(115deg, var(--color-brand), var(--color-brand-deep));
+    color: #fff;
+}
+
+/* Judul bagian dengan penanda warna agar halaman mudah dipindai */
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+.section-title::before {
+    content: '';
+    width: 0.3rem;
+    height: 1.25rem;
+    border-radius: 9999px;
+    background: linear-gradient(180deg, var(--color-ochre), var(--color-brand));
+}
+
+/* Ubin ikon kategori menu */
+.cat-tile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 1rem;
+}
+.cat-tile[data-cat='makanan'] { background: var(--color-ochre-wash); color: var(--color-ochre-ink); }
+.cat-tile[data-cat='minuman'] { background: var(--color-process-wash); color: var(--color-process); }
+.cat-tile[data-cat='galon'] { background: var(--color-brand-wash); color: var(--color-brand); }
+
+/* Tombol yang sedang memproses (dikunci agar tidak terkirim dua kali) */
+button[aria-busy='true'],
+input[aria-busy='true'] {
+    cursor: progress;
+    opacity: 0.75;
+}
+button[aria-busy='true']::after {
+    content: '';
+    display: inline-block;
+    width: 0.9em;
+    height: 0.9em;
+    margin-left: 0.5rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 9999px;
+    vertical-align: -0.12em;
+    animation: kos-spin 0.7s linear infinite;
+}
+@keyframes kos-spin {
+    to { transform: rotate(360deg); }
 }

@@ -2,13 +2,14 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Tests\Concerns\CreatesKosFixtures;
 use Tests\TestCase;
 
 class LoginTest extends TestCase
 {
-    use DatabaseTransactions;
+    use RefreshDatabase, CreatesKosFixtures;
 
     /**
      * Test login page loads successfully with the new design elements.
@@ -61,9 +62,6 @@ class LoginTest extends TestCase
         $response->assertSee('Pak H. Tiana');
     }
 
-    /**
-     * Test validation failure renders friendly error message.
-     */
     public function test_login_failure_displays_humanized_inline_error(): void
     {
         $response = $this->from('/login')->post('/login', [
@@ -72,47 +70,115 @@ class LoginTest extends TestCase
         ]);
 
         $response->assertRedirect('/login');
-        $response->assertSessionHasErrors('email');
-
-        $view = $this->view('auth.login', [
-            'errors' => session('errors'),
-        ]);
-
-        $view->assertSee('Email atau kata sandi tidak cocok. Coba lagi.');
-        $view->assertSee('border-alert');
+        $response->assertSessionHasErrors(['email' => 'Email atau kata sandi yang Anda masukkan tidak sesuai.']);
+        $this->assertGuest();
     }
 
-    /**
-     * Test successful login redirects to respective role page.
-     */
     public function test_successful_login_redirects_to_role_dashboard(): void
     {
-        $user = User::where('role', 'penghuni')->first();
+        $user = $this->makeTenant();
 
-        $response = $this->post('/login', [
-            'email' => $user->email,
-            'password' => 'password',
-        ]);
+        $response = $this->post('/login', ['email' => $user->email, 'password' => 'password']);
 
         $this->assertAuthenticatedAs($user);
         $response->assertRedirect(route('penghuni.beranda'));
     }
 
-    /**
-     * Test quick demo logins still function properly.
-     */
-    public function test_demo_logins_work_properly(): void
+    public function test_login_is_throttled_after_repeated_failures(): void
     {
-        $resPengelola = $this->get(route('demo.login', 'pengelola'));
-        $resPengelola->assertRedirect(route('pengelola.dashboard'));
+        $user = $this->makeUser('pengelola');
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->post('/login', ['email' => $user->email, 'password' => 'salah']);
+        }
+
+        // Percobaan ke-6 ditolak walau kata sandinya benar.
+        $response = $this->from('/login')->post('/login', ['email' => $user->email, 'password' => 'password']);
+
+        $response->assertSessionHasErrors('email');
+        $this->assertStringContainsString('Terlalu banyak percobaan', session('errors')->first('email'));
+        $this->assertGuest();
+    }
+
+    public function test_checked_out_tenant_cannot_log_in(): void
+    {
+        $user = $this->makeTenant();
+        $user->tenantProfile->update(['is_active' => false]);
+
+        $this->post('/login', ['email' => $user->email, 'password' => 'password'])
+            ->assertSessionHasErrors('email');
+
+        $this->assertGuest();
+    }
+
+    public function test_checked_out_tenant_with_live_session_is_kicked_out(): void
+    {
+        $user = $this->makeTenant();
+        $this->actingAs($user);
+        $user->tenantProfile->update(['is_active' => false]);
+
+        $this->get(route('penghuni.beranda'))->assertRedirect(route('login'));
+        $this->assertGuest();
+    }
+
+    public function test_demo_logins_work_when_enabled(): void
+    {
+        $this->makeUser('pengelola', ['email' => 'pengelola@kostiana.com']);
+        $this->makeUser('petugas', ['email' => 'petugas@kostiana.com']);
+        $this->makeTenant(['email' => 'penghuni@kostiana.com']);
+
+        $this->get(route('demo.login', 'pengelola'))->assertRedirect(route('pengelola.dashboard'));
         $this->assertEquals('pengelola', auth()->user()->role);
 
-        $resPetugas = $this->get(route('demo.login', 'petugas'));
-        $resPetugas->assertRedirect(route('petugas.antrean'));
+        $this->get(route('demo.login', 'petugas'))->assertRedirect(route('petugas.antrean'));
         $this->assertEquals('petugas', auth()->user()->role);
 
-        $resPenghuni = $this->get(route('demo.login', 'penghuni'));
-        $resPenghuni->assertRedirect(route('penghuni.beranda'));
+        $this->get(route('demo.login', 'penghuni'))->assertRedirect(route('penghuni.beranda'));
         $this->assertEquals('penghuni', auth()->user()->role);
+    }
+
+    public function test_demo_login_is_not_available_when_disabled(): void
+    {
+        config(['kos.demo_login' => false]);
+        $this->makeUser('pengelola', ['email' => 'pengelola@kostiana.com']);
+
+        $this->get(route('demo.login', 'pengelola'))->assertNotFound();
+        $this->assertGuest();
+
+        $this->get('/login')->assertOk()->assertDontSee('Coba tanpa akun');
+    }
+
+    public function test_temporary_password_must_be_changed_before_using_the_app(): void
+    {
+        $user = $this->makeTenant(['must_change_password' => true]);
+        $this->actingAs($user);
+
+        $this->get(route('penghuni.beranda'))->assertRedirect(route('penghuni.profil'));
+        $this->get(route('penghuni.profil'))->assertOk();
+
+        $this->put(route('profil.password'), [
+            'current_password'      => 'password',
+            'password'              => 'sandibaru123',
+            'password_confirmation' => 'sandibaru123',
+        ])->assertRedirect(route('penghuni.profil'));
+
+        $this->assertFalse($user->fresh()->must_change_password);
+        $this->get(route('penghuni.beranda'))->assertOk();
+    }
+
+    public function test_password_change_rejects_wrong_current_password_and_weak_passwords(): void
+    {
+        $user = $this->makeUser('petugas');
+        $this->actingAs($user);
+
+        $this->put(route('profil.password'), [
+            'current_password' => 'salah', 'password' => 'sandibaru123', 'password_confirmation' => 'sandibaru123',
+        ])->assertSessionHasErrors('current_password');
+
+        $this->put(route('profil.password'), [
+            'current_password' => 'password', 'password' => 'pendek', 'password_confirmation' => 'pendek',
+        ])->assertSessionHasErrors('password');
+
+        $this->assertTrue(Hash::check('password', $user->fresh()->password));
     }
 }

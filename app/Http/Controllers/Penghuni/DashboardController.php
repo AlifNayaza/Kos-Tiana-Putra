@@ -41,28 +41,6 @@ class DashboardController extends Controller
             }
         }
 
-        // Cek peringatan jatuh tempo (FR-12)
-        $billAlert = null;
-        if ($activeBill && $activeBill->status !== 'lunas') {
-            $now = Carbon::now()->startOfDay();
-            $dueDate = Carbon::parse($activeBill->due_date)->startOfDay();
-            $daysDiff = $now->diffInDays($dueDate, false);
-
-            if ($daysDiff < 0) {
-                $billAlert = [
-                    'type' => 'danger',
-                    'title' => 'Tagihan Sewa Melewati Jatuh Tempo!',
-                    'message' => 'Tagihan bulan ' . $activeBill->period_label . ' sebesar ' . $activeBill->formatted_amount . ' telah lewat jatuh tempo ' . abs($daysDiff) . ' hari yang lalu. Mohon segera lakukan pembayaran.',
-                ];
-            } elseif ($daysDiff <= 5) {
-                $billAlert = [
-                    'type' => 'warning',
-                    'title' => 'Pengingat Jatuh Tempo Sewa',
-                    'message' => 'Tagihan sewa bulan ' . $activeBill->period_label . ' sebesar ' . $activeBill->formatted_amount . ' akan jatuh tempo dalam ' . ($daysDiff == 0 ? 'hari ini' : $daysDiff . ' hari lagi') . ' (tgl ' . $dueDate->format('d M Y') . ').',
-                ];
-            }
-        }
-
         // Pesanan aktif saat ini (Menunggu, Diproses, Diantar)
         $activeOrders = Order::with('items')
             ->where('user_id', $user->id)
@@ -70,24 +48,10 @@ class DashboardController extends Controller
             ->latest()
             ->get();
 
-        // Pesanan terbaru yang pernah selesai
-        $recentCompletedOrder = Order::with('items')
-            ->where('user_id', $user->id)
-            ->where('status', 'selesai')
-            ->latest('completed_at')
-            ->first();
-
         // Daftar produk kategori 'galon' untuk widget Quick Order 1-Click (FR-09)
         $galonItems = CatalogItem::where('category', 'galon')
             ->where('is_available', true)
             ->orderBy('price', 'asc')
-            ->get();
-
-        // Rekomendasi menu populer warkop hari ini (makanan & minuman dengan stok tersedia)
-        $popularItems = CatalogItem::whereIn('category', ['makanan', 'minuman'])
-            ->where('is_available', true)
-            ->where('stock', '>', 0)
-            ->take(4)
             ->get();
 
         // Cari pesanan galon terakhir penghuni untuk fitur "Pesan ulang galon terakhir"
@@ -122,11 +86,8 @@ class DashboardController extends Controller
             'tenantProfile',
             'room',
             'activeBill',
-            'billAlert',
             'activeOrders',
-            'recentCompletedOrder',
             'galonItems',
-            'popularItems',
             'lastGalonItem',
             'lastGalonQty'
         ));

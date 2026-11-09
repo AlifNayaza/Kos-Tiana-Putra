@@ -90,6 +90,46 @@ def get_db_connection(db_cfg):
 
 
 # =====================================================================
+# BAGIAN 2B: PERAMALAN & UJI AKURASI (BACKTEST)
+# =====================================================================
+def forecast_next_7_days(y):
+    """Gabungan 50% Regresi Linear + 50% Moving Average 7 hari untuk 7 hari ke depan.
+
+    Mengembalikan (total_7_hari, slope). Dipakai untuk prediksi sebenarnya dan untuk backtest,
+    sehingga akurasi yang dilaporkan benar-benar mengukur metode yang sama.
+    """
+    n = len(y)
+    X = np.arange(1, n + 1).reshape(-1, 1)
+    model = LinearRegression()
+    model.fit(X, y)
+
+    hari_ke_depan = np.arange(n + 1, n + 8).reshape(-1, 1)
+    total_regresi = float(np.sum(np.clip(model.predict(hari_ke_depan), 0, None)))
+    total_moving_avg = float(np.mean(y[-7:])) * 7.0
+
+    return (0.5 * total_regresi) + (0.5 * total_moving_avg), float(model.coef_[0])
+
+
+def backtest_accuracy(y, holdout=7):
+    """Skor akurasi 0..1 dari uji mundur: latih pada data sebelum `holdout` hari terakhir,
+    prediksi total penjualan `holdout` hari itu, lalu bandingkan dengan kenyataan.
+
+    akurasi = 1 - |prediksi - aktual| / max(aktual, prediksi, 1). Mengembalikan None bila
+    data terlalu sedikit untuk diuji (tidak ada penjualan di periode uji maupun latih).
+    """
+    if len(y) < holdout + 14:
+        return None
+
+    train, actual = y[:-holdout], float(np.sum(y[-holdout:]))
+    if float(np.sum(train)) == 0 and actual == 0:
+        return None
+
+    predicted, _ = forecast_next_7_days(train)
+    denom = max(actual, predicted, 1.0)
+    return round(max(0.0, min(1.0, 1.0 - abs(predicted - actual) / denom)), 2)
+
+
+# =====================================================================
 # BAGIAN 3: FUNGSI UTAMA PREDIKSI STOK MACHINE LEARNING
 # =====================================================================
 def run_prediction():
@@ -103,6 +143,7 @@ def run_prediction():
         SELECT id, name, category, price, stock, minimum_stock, unit 
         FROM catalog_items 
         WHERE is_available = 1
+          AND deleted_at IS NULL
         ORDER BY id ASC
     """
     catalog_df = pd.read_sql(catalog_query, conn)
@@ -160,36 +201,22 @@ def run_prediction():
         else:
             df_harian['total_terjual'] = 0.0
 
-        # Regresi Linear: X = urutan hari 1..30, y = penjualan
-        X = np.arange(1, 31).reshape(-1, 1)
-        y = df_harian['total_terjual'].values
-
+        y = df_harian['total_terjual'].values.astype(float)
         total_terjual_30_hari = float(np.sum(y))
 
         if total_terjual_30_hari == 0:
+            # Tidak ada riwayat penjualan: tebakan konservatif, akurasi tidak dapat diukur (0.00).
             daily_avg = 0.0
             predicted_demand = max(2, int(math.ceil(safety_stock * 0.5)))
             sales_trend = 'stabil'
-            confidence = 0.78
+            confidence = 0.0
         else:
             daily_avg = round(total_terjual_30_hari / 30.0, 1)
-            rata_rata_7_hari_terakhir = float(np.mean(y[-7:]))
 
-            model = LinearRegression()
-            model.fit(X, y)
-
-            hari_ke_depan = np.arange(31, 38).reshape(-1, 1)
-            prediksi_harian_regresi = np.clip(model.predict(hari_ke_depan), 0, None)
-            total_7_hari_regresi = float(np.sum(prediksi_harian_regresi))
-
-            total_7_hari_moving_avg = rata_rata_7_hari_terakhir * 7.0
-
-            # 50% Regresi Linear + 50% Moving Average 7 Hari
-            gabungan_prediksi = (0.5 * total_7_hari_regresi) + (0.5 * total_7_hari_moving_avg)
+            gabungan_prediksi, slope = forecast_next_7_days(y)
             predicted_demand = max(1, int(math.ceil(gabungan_prediksi)))
 
             # Arah tren dari slope garis regresi
-            slope = float(model.coef_[0])
             if slope > 0.025:
                 sales_trend = 'naik'
             elif slope < -0.025:
@@ -197,8 +224,9 @@ def run_prediction():
             else:
                 sales_trend = 'stabil'
 
-            r2_score = max(0.0, float(model.score(X, y)))
-            confidence = round(min(0.96, 0.84 + (r2_score * 0.12)), 2)
+            # Akurasi hasil uji mundur (bukan angka tetap); 0.00 bila data belum cukup untuk diuji
+            backtest = backtest_accuracy(y)
+            confidence = backtest if backtest is not None else 0.0
 
         # Target Stok Aman & Saran Restock
         target_stock = predicted_demand + safety_stock

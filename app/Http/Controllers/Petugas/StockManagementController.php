@@ -41,29 +41,52 @@ class StockManagementController extends Controller
     }
 
     /**
-     * Catat mutasi stok masuk (restock) atau stok keluar manual (rusak/bocor) (FR-10).
+     * Catat mutasi stok masuk (restock), keluar manual (rusak/bocor), atau stock opname (FR-10).
+     *
+     * Untuk opname, klien mengirim `physical_count` (hasil hitung fisik). Selisih dihitung di server
+     * terhadap stok terkini yang sudah dikunci, bukan angka lama yang dilihat petugas di layar,
+     * sehingga stok akhir selalu sama dengan hasil hitung fisik walau ada pesanan masuk bersamaan.
      * Menerapkan NFR-05 Integritas Data via DB::transaction & lockForUpdate.
      */
     public function adjustStock(Request $request)
     {
+        $isOpname = $request->filled('physical_count');
+
         $request->validate([
-            'catalog_item_id' => ['required', 'exists:catalog_items,id'],
-            'type'            => ['required', 'in:in,out'],
-            'quantity'        => ['required', 'integer', 'min:1', 'max:500'],
-            'notes'           => ['required', 'string', 'max:255'],
+            'catalog_item_id' => ['required', 'integer', 'exists:catalog_items,id'],
+            'physical_count'  => ['nullable', 'integer', 'min:0', 'max:100000'],
+            'type'            => [$isOpname ? 'nullable' : 'required', 'in:in,out'],
+            'quantity'        => [$isOpname ? 'nullable' : 'required', 'integer', 'min:1', 'max:500'],
+            'notes'           => ['required', 'string', 'max:200'],
         ]);
 
         $itemId = (int) $request->input('catalog_item_id');
-        $type = $request->input('type');
-        $qty = (int) $request->input('quantity');
         $notes = trim($request->input('notes'));
         $petugas = Auth::user();
 
-        $result = DB::transaction(function () use ($itemId, $type, $qty, $notes, $petugas) {
+        $result = DB::transaction(function () use ($request, $isOpname, $itemId, $notes, $petugas) {
             // Kunci baris dengan lockForUpdate untuk mencegah race condition
             $catalogItem = CatalogItem::where('id', $itemId)->lockForUpdate()->firstOrFail();
 
             $beforeStock = $catalogItem->stock;
+
+            if ($isOpname) {
+                $physical = (int) $request->input('physical_count');
+                $delta = $physical - $beforeStock;
+
+                if ($delta === 0) {
+                    return ['item' => $catalogItem, 'type' => 'opname', 'qty' => 0, 'delta' => 0, 'after_stock' => $beforeStock];
+                }
+
+                $type = $delta > 0 ? 'in' : 'out';
+                $qty = abs($delta);
+                $notes .= ($notes !== '' ? ': ' : '') . "Hitung fisik {$beforeStock} -> {$physical}";
+                $referenceType = 'stock_opname';
+            } else {
+                $type = $request->input('type');
+                $qty = (int) $request->input('quantity');
+                $referenceType = 'manual_adjustment';
+            }
 
             if ($type === 'out') {
                 if ($catalogItem->stock < $qty) {
@@ -79,24 +102,30 @@ class StockManagementController extends Controller
             }
 
             // Catat ke audit log mutasi stok
-            $log = StockLog::create([
+            StockLog::create([
                 'catalog_item_id' => $catalogItem->id,
                 'user_id'         => $petugas->id,
                 'type'            => $type,
                 'quantity'        => $qty,
                 'before_stock'    => $beforeStock,
                 'after_stock'     => $afterStock,
-                'reference_type'  => 'manual_adjustment',
+                'reference_type'  => $referenceType,
                 'notes'           => $notes,
             ]);
 
-            return [
-                'item'        => $catalogItem,
-                'type'        => $type,
-                'qty'         => $qty,
-                'after_stock' => $afterStock,
-            ];
+            return ['item' => $catalogItem, 'type' => $type, 'qty' => $qty, 'delta' => $type === 'in' ? $qty : -$qty, 'after_stock' => $afterStock, 'opname' => $isOpname];
         });
+
+        if ($result['type'] === 'opname') {
+            return redirect()->back()
+                ->with('info', "Stok \"{$result['item']->name}\" sudah sesuai hitung fisik ({$result['after_stock']} {$result['item']->unit}); tidak ada perubahan.");
+        }
+
+        if (!empty($result['opname'])) {
+            $sign = $result['delta'] > 0 ? '+' : '';
+            return redirect()->back()
+                ->with('success', "Stock opname \"{$result['item']->name}\" tercatat: selisih {$sign}{$result['delta']} {$result['item']->unit}. Stok aktual sekarang {$result['after_stock']} {$result['item']->unit}.");
+        }
 
         $typeLabel = $result['type'] === 'in' ? 'penambahan (+)' : 'pengurangan (-)';
         return redirect()->back()

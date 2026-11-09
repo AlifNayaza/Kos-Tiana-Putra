@@ -6,14 +6,31 @@
     onlyGalon: false,
     secondsAgo: 0,
     isRefreshing: false,
+    sig: @js($signature),
 
     init() {
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                document.title = document.title.replace('(Baru) ', '');
+                this.checkQueue();
+            }
+        });
         setInterval(() => {
             this.secondsAgo++;
-            if (this.secondsAgo >= 30) {
-                this.refreshQueue();
+            // Tab tersembunyi tidak perlu polling; segarkan sekali saat kembali dibuka.
+            if (this.secondsAgo >= 30 && !document.hidden) {
+                this.checkQueue();
             }
         }, 1000);
+    },
+
+    // Polling hemat: tanya tanda perubahan (JSON beberapa byte); unduh HTML penuh hanya bila berubah.
+    checkQueue() {
+        this.secondsAgo = 0;
+        fetch('{{ route('petugas.antrean.signal') }}', { headers: { 'Accept': 'application/json' } })
+            .then(res => res.json())
+            .then(data => { if (data.sig !== this.sig) this.refreshQueue(); })
+            .catch(() => {});
     },
 
     refreshQueue() {
@@ -28,7 +45,12 @@
             const newQueue = doc.getElementById('queue-content');
             const target = document.getElementById('queue-content');
             if (newQueue && target) {
+                const known = new Set([...target.querySelectorAll('[data-order-id]')].map(e => e.dataset.orderId));
+                const fresh = [...newQueue.querySelectorAll('[data-order-id][data-order-status=menunggu]')]
+                    .filter(e => !known.has(e.dataset.orderId));
                 target.innerHTML = newQueue.innerHTML;
+                if (newQueue.dataset.sig) this.sig = newQueue.dataset.sig;
+                if (fresh.length > 0) this.announceNewOrders(fresh.length);
             }
             this.secondsAgo = 0;
             this.isRefreshing = false;
@@ -36,6 +58,12 @@
         .catch(() => {
             this.isRefreshing = false;
         });
+    },
+
+    announceNewOrders(count) {
+        window.kosToast(count === 1 ? '1 pesanan baru masuk ke antrean' : count + ' pesanan baru masuk ke antrean', 'info');
+        if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+        if (document.hidden && !document.title.startsWith('(Baru)')) document.title = '(Baru) ' + document.title;
     },
 
     matches(orderStatus, hasGalon) {
@@ -50,8 +78,8 @@
     <!-- ============================================================== -->
     <div class="flex items-center justify-between pb-1">
         <div>
-            <h1 class="text-base sm:text-lg font-bold text-ink leading-tight">Antrean</h1>
-            <p class="text-[11px] text-ink-faint mt-0.5">
+            <h1 class="text-3xl text-brand-deep leading-tight">Antrean</h1>
+            <p class="text-2xs text-ink-faint mt-0.5">
                 <span x-text="'diperbarui ' + secondsAgo + ' detik lalu'"></span>
                 <span x-show="isRefreshing" class="text-brand font-semibold ml-1 animate-pulse">Menyinkronkan...</span>
             </p>
@@ -77,25 +105,25 @@
         <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
             <button type="button" 
                     @click="activeFilter = 'semua'"
-                    :class="activeFilter === 'semua' ? 'bg-brand-wash text-brand font-bold border border-line' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
+                    :class="activeFilter === 'semua' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
                     class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
                 Semua ({{ $orders->count() }})
             </button>
             <button type="button" 
                     @click="activeFilter = 'menunggu'"
-                    :class="activeFilter === 'menunggu' ? 'bg-brand-wash text-brand font-bold border border-line' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
+                    :class="activeFilter === 'menunggu' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
                     class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
                 Menunggu ({{ $metrics['menunggu'] }})
             </button>
             <button type="button" 
                     @click="activeFilter = 'diproses'"
-                    :class="activeFilter === 'diproses' ? 'bg-brand-wash text-brand font-bold border border-line' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
+                    :class="activeFilter === 'diproses' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
                     class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
                 Diproses ({{ $metrics['diproses'] }})
             </button>
             <button type="button" 
                     @click="activeFilter = 'diantar'"
-                    :class="activeFilter === 'diantar' ? 'bg-brand-wash text-brand font-bold border border-line' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
+                    :class="activeFilter === 'diantar' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
                     class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
                 Diantar ({{ $metrics['diantar'] }})
             </button>
@@ -122,7 +150,7 @@
     <!-- ============================================================== -->
     <!-- 3. KONTEN ANTREAN (Auto-Refresh Fragment)                       -->
     <!-- ============================================================== -->
-    <div id="queue-content">
+    <div id="queue-content" aria-live="polite" data-sig="{{ $signature }}">
         @if($orders->isEmpty())
             <div class="bg-surface rounded-xl border border-line p-8 text-center text-xs text-ink-faint shadow-xs space-y-1">
                 <p class="font-medium text-ink-soft">Tidak ada antrean pesanan aktif saat ini.</p>

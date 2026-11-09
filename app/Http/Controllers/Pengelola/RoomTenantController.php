@@ -8,8 +8,9 @@ use App\Models\TenantProfile;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class RoomTenantController extends Controller
 {
@@ -37,11 +38,12 @@ class RoomTenantController extends Controller
 
         $rooms = $query->orderBy('floor')->orderBy('room_number')->get();
 
+        $byStatus = Room::selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status');
         $stats = [
-            'total'     => Room::count(),
-            'terisi'    => Room::where('status', 'terisi')->count(),
-            'tersedia'  => Room::where('status', 'tersedia')->count(),
-            'perbaikan' => Room::where('status', 'perbaikan')->count(),
+            'total'     => (int) $byStatus->sum(),
+            'terisi'    => (int) ($byStatus['terisi'] ?? 0),
+            'tersedia'  => (int) ($byStatus['tersedia'] ?? 0),
+            'perbaikan' => (int) ($byStatus['perbaikan'] ?? 0),
         ];
 
         return view('pengelola.kamar.index', compact('rooms', 'stats', 'statusFilter', 'floorFilter'));
@@ -101,6 +103,12 @@ class RoomTenantController extends Controller
                 ->with('error', "Kamar {$room->room_number} tidak dapat dihapus karena masih berstatus terisi penghuni.");
         }
 
+        // Kamar yang pernah dihuni / punya tagihan tidak dihapus agar riwayat keuangan tetap utuh.
+        if ($room->tenantProfiles()->exists() || $room->rentBills()->exists()) {
+            return redirect()->back()
+                ->with('error', "Kamar {$room->room_number} sudah memiliki riwayat penghuni/tagihan sehingga tidak dapat dihapus. Ubah statusnya menjadi Perbaikan bila tidak dipakai.");
+        }
+
         $roomNumber = $room->room_number;
         $room->delete();
 
@@ -157,7 +165,7 @@ class RoomTenantController extends Controller
             'name'                    => ['required', 'string', 'max:255'],
             'email'                   => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone'                   => ['required', 'string', 'max:20'],
-            'room_id'                 => ['required', 'exists:rooms,id'],
+            'room_id'                 => ['required', 'integer', 'exists:rooms,id'],
             'id_card_number'          => ['nullable', 'string', 'max:30'],
             'emergency_contact_name'  => ['nullable', 'string', 'max:255'],
             'emergency_contact_phone' => ['nullable', 'string', 'max:20'],
@@ -166,14 +174,26 @@ class RoomTenantController extends Controller
             'start_date'              => ['required', 'date'],
         ]);
 
-        DB::transaction(function () use ($request) {
+        $tempPassword = Str::password(10, symbols: false);
+
+        DB::transaction(function () use ($request, $tempPassword) {
+            // 0. Kunci kamar dan pastikan masih tersedia (cegah satu kamar dihuni dua orang)
+            $room = Room::whereKey($request->input('room_id'))->lockForUpdate()->firstOrFail();
+
+            if ($room->status !== 'tersedia' || $room->activeTenantProfile()->exists()) {
+                throw ValidationException::withMessages([
+                    'room_id' => "Kamar {$room->room_number} tidak tersedia (status: {$room->status}). Pilih kamar lain.",
+                ]);
+            }
+
             // 1. Buat akun user penghuni
             $user = User::create([
                 'name'              => $request->input('name'),
                 'email'             => $request->input('email'),
                 'phone'             => $request->input('phone'),
                 'role'              => 'penghuni',
-                'password'          => Hash::make('password'), // default password
+                'password'          => $tempPassword, // di-hash otomatis oleh cast "hashed"
+                'must_change_password' => true,
                 'email_verified_at' => now(),
             ]);
 
@@ -192,11 +212,12 @@ class RoomTenantController extends Controller
             ]);
 
             // 3. Otomatis ubah status kamar menjadi 'terisi'
-            Room::where('id', $request->input('room_id'))->update(['status' => 'terisi']);
+            $room->update(['status' => 'terisi']);
         });
 
         return redirect()->route('pengelola.penghuni.index')
-            ->with('success', "Penghuni baru {$request->input('name')} berhasil didaftarkan dan ditempatkan di kamar.");
+            ->with('success', "Penghuni baru {$request->input('name')} berhasil didaftarkan dan ditempatkan di kamar.")
+            ->with('temp_password', ['name' => $request->input('name'), 'email' => $request->input('email'), 'password' => $tempPassword]);
     }
 
     /**
@@ -236,10 +257,38 @@ class RoomTenantController extends Controller
     }
 
     /**
+     * Reset kata sandi penghuni ke kata sandi sementara (penghuni wajib menggantinya saat masuk).
+     */
+    public function resetTenantPassword(TenantProfile $tenant)
+    {
+        if (!$tenant->is_active) {
+            return redirect()->back()->with('error', 'Penghuni ini sudah checkout; kata sandinya tidak dapat direset.');
+        }
+
+        $tempPassword = Str::password(10, symbols: false);
+
+        $tenant->user->forceFill([
+            'password'             => $tempPassword,
+            'must_change_password' => true,
+            'remember_token'       => Str::random(60),
+        ])->save();
+
+        return redirect()->route('pengelola.penghuni.index')
+            ->with('success', "Kata sandi {$tenant->user->name} berhasil direset.")
+            ->with('temp_password', ['name' => $tenant->user->name, 'email' => $tenant->user->email, 'password' => $tempPassword]);
+    }
+
+    /**
      * Checkout / Nonaktifkan penghuni dan kosongkan kembali kamar kos.
      */
     public function checkoutTenant(Request $request, TenantProfile $tenant)
     {
+        if (!$tenant->is_active) {
+            return redirect()->back()->with('info', 'Penghuni ini sudah checkout sebelumnya.');
+        }
+
+        $unpaid = $tenant->rentBills()->whereIn('status', ['menunggu', 'menunggak'])->count();
+
         DB::transaction(function () use ($tenant) {
             $roomId = $tenant->room_id;
 
@@ -255,7 +304,11 @@ class RoomTenantController extends Controller
             }
         });
 
-        return redirect()->route('pengelola.penghuni.index')
-            ->with('success', "Penghuni {$tenant->user->name} berhasil di-checkout. Kamar kembali berstatus Tersedia.");
+        $redirect = redirect()->route('pengelola.penghuni.index')
+            ->with('success', "Penghuni {$tenant->user->name} berhasil di-checkout. Kamar kembali berstatus Tersedia dan akunnya dinonaktifkan.");
+
+        return $unpaid > 0
+            ? $redirect->with('warning', "Perhatian: {$tenant->user->name} masih memiliki {$unpaid} tagihan sewa yang belum lunas.")
+            : $redirect;
     }
 }

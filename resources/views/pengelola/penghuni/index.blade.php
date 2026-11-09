@@ -34,6 +34,16 @@
     }
 }">
 
+    @if(session('temp_password'))
+        @php $tp = session('temp_password'); @endphp
+        <div class="bg-wait-wash border border-wait rounded-2xl p-4 sm:p-5 text-xs text-ink space-y-1.5" role="alert">
+            <p class="font-bold">Kata sandi sementara untuk {{ $tp['name'] }}</p>
+            <p>Email: <span class="font-semibold">{{ $tp['email'] }}</span></p>
+            <p>Kata sandi: <code class="font-mono font-bold text-sm bg-surface px-2 py-0.5 rounded border border-line select-all">{{ $tp['password'] }}</code></p>
+            <p class="text-ink-soft">Sampaikan kepada penghuni. Kata sandi ini hanya tampil sekali dan wajib diganti saat penghuni masuk pertama kali.</p>
+        </div>
+    @endif
+
     <!-- Filter & Action Header -->
     <div class="bg-surface p-4 sm:p-5 rounded-2xl border border-line shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <!-- Tab Filter & Search -->
@@ -75,7 +85,7 @@
     <!-- Tenants Table List -->
     <div class="bg-surface rounded-2xl border border-line shadow-xs overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
+            <table class="w-full text-left text-xs table-stack">
                 <thead>
                     <tr class="bg-canvas border-b border-line text-ink-soft uppercase tracking-wider font-semibold">
                         <th class="py-3.5 px-4 sm:px-6">Nama & Kontak</th>
@@ -90,71 +100,71 @@
                     @forelse($tenants as $tenant)
                         <tr class="hover:bg-canvas transition-colors">
                             <!-- Nama & Kontak -->
-                            <td class="py-4 px-4 sm:px-6">
+                            <td class="py-4 px-4 sm:px-6" data-primary>
                                 <div class="flex items-center space-x-3">
                                     <div class="w-9 h-9 rounded-full bg-brand-wash text-brand font-bold flex items-center justify-center text-xs flex-shrink-0">
                                         {{ substr($tenant->user->name ?? 'P', 0, 2) }}
                                     </div>
                                     <div>
                                         <p class="font-bold text-ink leading-tight">{{ $tenant->user->name ?? 'Tanpa Nama' }}</p>
-                                        <p class="text-ink-soft text-[11px] mt-0.5">{{ $tenant->user->phone ?? '-' }}</p>
-                                        <p class="text-ink-faint text-[10px]">{{ $tenant->user->email ?? '-' }}</p>
+                                        <p class="text-ink-soft text-2xs mt-0.5">{{ $tenant->user->phone ?? '-' }}</p>
+                                        <p class="text-ink-faint text-2xs">{{ $tenant->user->email ?? '-' }}</p>
                                     </div>
                                 </div>
                             </td>
 
                             <!-- Kamar -->
-                            <td class="py-4 px-4 whitespace-nowrap">
+                            <td class="py-4 px-4 whitespace-nowrap" data-label="Kamar"><div class="cell-value">
                                 @if($tenant->room)
                                     <div class="inline-flex items-center px-2.5 py-1 rounded-lg bg-brand-wash border border-brand/20 text-brand font-bold text-xs">
                                         {{ $tenant->room->room_number }}
                                     </div>
-                                    <p class="text-[11px] text-ink-soft mt-1 tabular-nums">{{ $tenant->room->formatted_price }}/bln</p>
+                                    <p class="text-2xs text-ink-soft mt-1 tabular-nums">{{ $tenant->room->formatted_price }}/bln</p>
                                 @else
                                     <span class="text-ink-faint italic">Tidak ada kamar</span>
                                 @endif
-                            </td>
+                            </div></td>
 
                             <!-- Identitas & Instansi -->
-                            <td class="py-4 px-4">
+                            <td class="py-4 px-4" data-label="Identitas"><div class="cell-value">
                                 <div class="space-y-0.5">
                                     <p class="font-medium text-ink">{{ $tenant->occupation ?? 'Mahasiswa/Karyawan' }}</p>
-                                    <p class="text-ink-soft text-[11px]">{{ $tenant->institution ?? '-' }}</p>
-                                    <p class="text-ink-faint text-[10px] tabular-nums font-mono">NIK: {{ $tenant->id_card_number ?? '-' }}</p>
+                                    <p class="text-ink-soft text-2xs">{{ $tenant->institution ?? '-' }}</p>
+                                    <p class="text-ink-faint text-2xs tabular-nums font-mono">NIK: {{ $tenant->id_card_number ?? '-' }}</p>
                                 </div>
-                            </td>
+                            </div></td>
 
                             <!-- Kontak Darurat -->
-                            <td class="py-4 px-4">
+                            <td class="py-4 px-4" data-label="Kontak darurat"><div class="cell-value">
                                 @if($tenant->emergency_contact_name)
                                     <div>
                                         <p class="font-semibold text-ink">{{ $tenant->emergency_contact_name }}</p>
-                                        <p class="text-ink-soft text-[11px]">{{ $tenant->emergency_contact_phone }}</p>
+                                        <p class="text-ink-soft text-2xs">{{ $tenant->emergency_contact_phone }}</p>
                                     </div>
                                 @else
                                     <span class="text-ink-faint italic">Belum diisi</span>
                                 @endif
-                            </td>
+                            </div></td>
 
                             <!-- Periode Huni -->
-                            <td class="py-4 px-4 whitespace-nowrap">
+                            <td class="py-4 px-4 whitespace-nowrap" data-label="Periode huni"><div class="cell-value">
                                 <div class="text-ink">
                                     <span class="font-medium">Masuk:</span> {{ \Carbon\Carbon::parse($tenant->start_date)->format('d M Y') }}
                                 </div>
                                 @if(!$tenant->is_active && $tenant->end_date)
-                                    <div class="text-alert text-[11px] mt-0.5 font-medium">
+                                    <div class="text-alert text-2xs mt-0.5 font-medium">
                                         Keluar: {{ \Carbon\Carbon::parse($tenant->end_date)->format('d M Y') }}
                                     </div>
                                 @else
-                                    <span class="inline-flex items-center mt-1 text-[10px] font-bold text-done bg-done-wash px-2 py-0.5 rounded-full border border-done/20">
+                                    <span class="inline-flex items-center mt-1 text-2xs font-bold text-done bg-done-wash px-2 py-0.5 rounded-full border border-done/20">
                                         Aktif Menghuni
                                     </span>
                                 @endif
-                            </td>
+                            </div></td>
 
                             <!-- Aksi -->
-                            <td class="py-4 px-4 sm:px-6 text-right whitespace-nowrap">
-                                <div class="flex items-center justify-end space-x-2">
+                            <td class="py-4 px-4 sm:px-6 text-right whitespace-nowrap" data-actions>
+                                <div class="flex flex-wrap items-center justify-end gap-2">
                                     <button type="button" 
                                             @click="openEdit({{ json_encode($tenant) }})" 
                                             class="text-xs font-semibold text-ink hover:text-brand bg-canvas hover:bg-brand-wash px-2.5 py-1.5 rounded-lg border border-line transition-colors">
@@ -162,6 +172,14 @@
                                     </button>
 
                                     @if($tenant->is_active)
+                                        <form action="{{ route('pengelola.penghuni.reset_password', $tenant->id) }}" method="POST"
+                                              onsubmit="return confirm('Reset kata sandi {{ $tenant->user->name }} ke kata sandi sementara?');">
+                                            @csrf
+                                            <button type="submit" class="text-xs font-semibold text-ink hover:text-brand bg-canvas hover:bg-brand-wash px-2.5 py-1.5 rounded-lg border border-line transition-colors">
+                                                Reset Sandi
+                                            </button>
+                                        </form>
+
                                         <form action="{{ route('pengelola.penghuni.checkout', $tenant->id) }}" method="POST" 
                                               onsubmit="return confirm('Apakah Anda yakin ingin memproses Checkout untuk {{ $tenant->user->name }}? Kamar {{ $tenant->room->room_number ?? '' }} akan otomatis berstatus Tersedia kembali.');">
                                             @csrf
@@ -210,13 +228,16 @@
                     </button>
                 </div>
 
-                <form action="{{ route('pengelola.penghuni.store') }}" method="POST" class="mt-4 space-y-4">
+                <form action="{{ route('pengelola.penghuni.store') }}" method="POST" class="mt-4 space-y-4" data-restore="penghuni-baru" data-open-var="createModalOpen">
                     @csrf
+                    <input type="hidden" name="_restore" value="penghuni-baru">
+                    <x-form-errors form="penghuni-baru" />
 
                     <div>
                         <label class="block text-xs font-semibold text-ink mb-1">Nama Lengkap Penghuni <span class="text-alert">*</span></label>
                         <input type="text" name="name" required placeholder="Contoh: Budi Santoso" 
                                class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="name" />
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
@@ -224,11 +245,13 @@
                             <label class="block text-xs font-semibold text-ink mb-1">Email (Untuk Login) <span class="text-alert">*</span></label>
                             <input type="email" name="email" required placeholder="budi@email.com" 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="email" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink mb-1">Nomor WhatsApp / HP <span class="text-alert">*</span></label>
                             <input type="text" name="phone" required placeholder="08123456789" 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="phone" />
                         </div>
                     </div>
 
@@ -243,11 +266,13 @@
                                     </option>
                                 @endforeach
                             </select>
+                        <x-field-error name="room_id" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink mb-1">Mulai Huni <span class="text-alert">*</span></label>
                             <input type="date" name="start_date" value="{{ date('Y-m-d') }}" required 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="start_date" />
                         </div>
                     </div>
 
@@ -256,11 +281,13 @@
                             <label class="block text-xs font-semibold text-ink mb-1">NIK KTP</label>
                             <input type="text" name="id_card_number" placeholder="16 digit NIK" 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5 font-mono">
+                        <x-field-error name="id_card_number" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink mb-1">Pekerjaan</label>
                             <input type="text" name="occupation" placeholder="Mahasiswa / Karyawan Swasta" 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="occupation" />
                         </div>
                     </div>
 
@@ -268,25 +295,28 @@
                         <label class="block text-xs font-semibold text-ink mb-1">Kampus / Instansi / Kantor</label>
                         <input type="text" name="institution" placeholder="Contoh: Universitas Brawijaya / PT Telkom" 
                                class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="institution" />
                     </div>
 
                     <div class="p-3 bg-canvas rounded-xl border border-line space-y-3">
-                        <p class="text-[11px] font-bold text-ink uppercase tracking-wider">Kontak Darurat (Keluarga/Wali)</p>
+                        <p class="text-2xs font-bold text-ink uppercase tracking-wider">Kontak Darurat (Keluarga/Wali)</p>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-[11px] font-medium text-ink-soft mb-1">Nama Kontak Darurat</label>
+                                <label class="block text-2xs font-medium text-ink-soft mb-1">Nama Kontak Darurat</label>
                                 <input type="text" name="emergency_contact_name" placeholder="Nama Orang Tua / Wali" 
                                        class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2">
+                        <x-field-error name="emergency_contact_name" />
                             </div>
                             <div>
-                                <label class="block text-[11px] font-medium text-ink-soft mb-1">Nomor Telepon Darurat</label>
+                                <label class="block text-2xs font-medium text-ink-soft mb-1">Nomor Telepon Darurat</label>
                                 <input type="text" name="emergency_contact_phone" placeholder="08..." 
                                        class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2">
+                        <x-field-error name="emergency_contact_phone" />
                             </div>
                         </div>
                     </div>
 
-                    <p class="text-[11px] text-ink-faint">
+                    <p class="text-2xs text-ink-faint">
                         * Password default akun penghuni baru diset otomatis ke: <strong class="font-mono text-ink">password</strong>
                     </p>
 
@@ -328,14 +358,19 @@
                     </button>
                 </div>
 
-                <form :action="editUrl" method="POST" class="mt-4 space-y-4">
+                <form :action="editUrl" method="POST" class="mt-4 space-y-4" data-restore="penghuni-ubah" data-open-var="editModalOpen" data-url-var="editUrl">
                     @csrf
+                    <input type="hidden" name="_restore" value="penghuni-ubah">
+                    <input type="hidden" name="_action" :value="editUrl">
+                    <input type="hidden" name="_edit" value="1">
+                    <x-form-errors form="penghuni-ubah" />
                     @method('PUT')
 
                     <div>
                         <label class="block text-xs font-semibold text-ink mb-1">Nama Lengkap <span class="text-alert">*</span></label>
                         <input type="text" name="name" x-model="editForm.name" required 
                                class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="name" />
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
@@ -343,11 +378,13 @@
                             <label class="block text-xs font-semibold text-ink mb-1">Email <span class="text-alert">*</span></label>
                             <input type="email" name="email" x-model="editForm.email" required 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="email" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink mb-1">Nomor WhatsApp / HP <span class="text-alert">*</span></label>
                             <input type="text" name="phone" x-model="editForm.phone" required 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="phone" />
                         </div>
                     </div>
 
@@ -356,11 +393,13 @@
                             <label class="block text-xs font-semibold text-ink mb-1">NIK KTP</label>
                             <input type="text" name="id_card_number" x-model="editForm.id_card_number" 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5 font-mono">
+                        <x-field-error name="id_card_number" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink mb-1">Pekerjaan</label>
                             <input type="text" name="occupation" x-model="editForm.occupation" 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="occupation" />
                         </div>
                     </div>
 
@@ -368,20 +407,23 @@
                         <label class="block text-xs font-semibold text-ink mb-1">Kampus / Instansi</label>
                         <input type="text" name="institution" x-model="editForm.institution" 
                                class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="institution" />
                     </div>
 
                     <div class="p-3 bg-canvas rounded-xl border border-line space-y-3">
-                        <p class="text-[11px] font-bold text-ink uppercase tracking-wider">Kontak Darurat</p>
+                        <p class="text-2xs font-bold text-ink uppercase tracking-wider">Kontak Darurat</p>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-[11px] font-medium text-ink-soft mb-1">Nama Kontak Darurat</label>
+                                <label class="block text-2xs font-medium text-ink-soft mb-1">Nama Kontak Darurat</label>
                                 <input type="text" name="emergency_contact_name" x-model="editForm.emergency_contact_name" 
                                        class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2">
+                        <x-field-error name="emergency_contact_name" />
                             </div>
                             <div>
-                                <label class="block text-[11px] font-medium text-ink-soft mb-1">Telepon Darurat</label>
+                                <label class="block text-2xs font-medium text-ink-soft mb-1">Telepon Darurat</label>
                                 <input type="text" name="emergency_contact_phone" x-model="editForm.emergency_contact_phone" 
                                        class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2">
+                        <x-field-error name="emergency_contact_phone" />
                             </div>
                         </div>
                     </div>

@@ -8,12 +8,12 @@
 
     <!-- Filter Bar -->
     <div class="bg-surface p-4 sm:p-5 rounded-2xl border border-line shadow-xs">
-        <form method="GET" action="{{ route('pengelola.stok.index') }}" class="flex flex-wrap items-center gap-3">
+        <form method="GET" action="{{ route('pengelola.stok.index') }}" class="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-center gap-3">
             <!-- Tipe Mutasi -->
             <div>
                 <label for="type" class="sr-only">Tipe Mutasi</label>
                 <select name="type" id="type" onchange="this.form.submit()" 
-                        class="text-xs font-semibold rounded-xl border border-line text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none py-2 pl-3 pr-8 bg-canvas">
+                        class="text-xs font-semibold rounded-xl border border-line text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none py-2.5 pl-3 pr-8 bg-canvas w-full sm:w-auto max-w-full">
                     <option value="semua" {{ !$typeFilter || $typeFilter === 'semua' ? 'selected' : '' }}>Semua Tipe (Masuk & Keluar)</option>
                     <option value="in" {{ $typeFilter === 'in' ? 'selected' : '' }}>Stok Masuk (Restock / Awal)</option>
                     <option value="out" {{ $typeFilter === 'out' ? 'selected' : '' }}>Stok Keluar (Terjual / Rusak)</option>
@@ -24,7 +24,7 @@
             <div>
                 <label for="item_id" class="sr-only">Pilih Item</label>
                 <select name="item_id" id="item_id" onchange="this.form.submit()" 
-                        class="text-xs font-semibold rounded-xl border border-line text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none py-2 pl-3 pr-8 bg-canvas">
+                        class="text-xs font-semibold rounded-xl border border-line text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none py-2.5 pl-3 pr-8 bg-canvas w-full sm:w-auto max-w-full">
                     <option value="semua" {{ !$itemFilter || $itemFilter === 'semua' ? 'selected' : '' }}>Semua Item Produk</option>
                     @foreach($catalogItems as $cItem)
                         <option value="{{ $cItem->id }}" {{ $itemFilter == $cItem->id ? 'selected' : '' }}>
@@ -35,10 +35,10 @@
             </div>
 
             <!-- Search Notes -->
-            <div class="relative">
+            <div class="relative w-full sm:w-auto">
                 <input type="text" name="q" value="{{ $search }}" placeholder="Cari keterangan / catatan..." 
-                       class="text-xs rounded-xl border border-line text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none pl-8 pr-4 py-2 bg-canvas w-48 sm:w-64">
-                <svg class="w-4 h-4 text-ink-faint absolute left-2.5 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="text-xs rounded-xl border border-line text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none pl-8 pr-4 py-2.5 bg-canvas w-full sm:w-64">
+                <svg class="w-4 h-4 text-ink-faint absolute left-2.5 top-3.5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                 </svg>
             </div>
@@ -54,7 +54,7 @@
     <!-- Stock Logs Table -->
     <div class="bg-surface rounded-2xl border border-line shadow-xs overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
+            <table class="w-full text-left text-xs table-stack">
                 <thead>
                     <tr class="bg-canvas border-b border-line text-ink-soft uppercase tracking-wider font-semibold">
                         <th class="py-3.5 px-4 sm:px-6">Waktu Mutasi</th>
@@ -69,17 +69,17 @@
                     @forelse($logs as $log)
                         <tr class="hover:bg-canvas transition-colors">
                             <!-- Waktu -->
-                            <td class="py-4 px-4 sm:px-6 whitespace-nowrap">
+                            <td class="py-4 px-4 sm:px-6 whitespace-nowrap" data-label="Waktu"><div class="cell-value">
                                 <p class="font-bold text-ink leading-tight">
                                     {{ $log->created_at->format('d/m/Y H:i') }}
                                 </p>
-                                <span class="text-[10px] text-ink-faint block mt-0.5">
+                                <span class="text-2xs text-ink-faint block mt-0.5">
                                     {{ $log->created_at->diffForHumans() }}
                                 </span>
-                            </td>
+                            </div></td>
 
                             <!-- Item -->
-                            <td class="py-4 px-4">
+                            <td class="py-4 px-4" data-label="Item"><div class="cell-value">
                                 <div class="flex items-center space-x-2">
                                     <span class="w-6 h-6 rounded-md bg-canvas flex items-center justify-center text-brand border border-line flex-shrink-0">
                                         @if($log->catalogItem?->category === 'galon')
@@ -98,13 +98,13 @@
                                     </span>
                                     <div>
                                         <p class="font-bold text-ink leading-tight">{{ $log->catalogItem->name ?? 'Item Dihapus' }}</p>
-                                        <span class="text-[10px] text-ink-soft uppercase font-medium">{{ $log->catalogItem->category ?? '-' }}</span>
+                                        <span class="text-2xs text-ink-soft uppercase font-medium">{{ $log->catalogItem->category ?? '-' }}</span>
                                     </div>
                                 </div>
-                            </td>
+                            </div></td>
 
                             <!-- Tipe Mutasi -->
-                            <td class="py-4 px-4 whitespace-nowrap">
+                            <td class="py-4 px-4 whitespace-nowrap" data-label="Tipe"><div class="cell-value">
                                 @if($log->type === 'in')
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-done-wash text-done border border-done/20">
                                         + Masuk ({{ $log->quantity }})
@@ -114,42 +114,42 @@
                                         - Keluar ({{ $log->quantity }})
                                     </span>
                                 @endif
-                            </td>
+                            </div></td>
 
                             <!-- Perubahan Stok -->
-                            <td class="py-4 px-4 whitespace-nowrap tabular-nums">
+                            <td class="py-4 px-4 whitespace-nowrap tabular-nums" data-label="Perubahan"><div class="cell-value">
                                 <div class="flex items-center space-x-2">
                                     <span class="text-ink-soft">{{ $log->before_stock }}</span>
                                     <svg class="w-3.5 h-3.5 text-ink-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
                                     </svg>
                                     <span class="font-bold text-ink">{{ $log->after_stock }}</span>
-                                    <span class="text-[10px] text-ink-faint font-normal">{{ $log->catalogItem->unit ?? '' }}</span>
+                                    <span class="text-2xs text-ink-faint font-normal">{{ $log->catalogItem->unit ?? '' }}</span>
                                 </div>
-                            </td>
+                            </div></td>
 
                             <!-- Pencatat -->
-                            <td class="py-4 px-4 whitespace-nowrap">
+                            <td class="py-4 px-4 whitespace-nowrap" data-label="Dicatat oleh"><div class="cell-value">
                                 <div class="flex items-center space-x-2">
-                                    <div class="w-6 h-6 rounded-full bg-canvas text-ink font-bold flex items-center justify-center text-[10px]">
+                                    <div class="w-6 h-6 rounded-full bg-canvas text-ink font-bold flex items-center justify-center text-2xs">
                                         {{ substr($log->user->name ?? 'S', 0, 1) }}
                                     </div>
                                     <div>
                                         <p class="font-semibold text-ink leading-tight">{{ $log->user->name ?? 'Sistem' }}</p>
-                                        <span class="text-[10px] text-ink-faint">{{ ucfirst($log->user->role ?? 'Sistem') }}</span>
+                                        <span class="text-2xs text-ink-faint">{{ ucfirst($log->user->role ?? 'Sistem') }}</span>
                                     </div>
                                 </div>
-                            </td>
+                            </div></td>
 
                             <!-- Catatan & Referensi -->
-                            <td class="py-4 px-4 sm:px-6">
+                            <td class="py-4 px-4 sm:px-6" data-label="Catatan"><div class="cell-value">
                                 <p class="text-ink leading-relaxed">{{ $log->notes ?? '-' }}</p>
                                 @if($log->reference_type)
-                                    <span class="inline-block mt-1 text-[10px] text-ink-faint font-mono bg-canvas px-1.5 py-0.5 rounded">
+                                    <span class="inline-block mt-1 text-2xs text-ink-faint font-mono bg-canvas px-1.5 py-0.5 rounded">
                                         Ref: {{ $log->reference_type }} {{ $log->reference_id ? '#' . $log->reference_id : '' }}
                                     </span>
                                 @endif
-                            </td>
+                            </div></td>
                         </tr>
                     @empty
                         <tr>

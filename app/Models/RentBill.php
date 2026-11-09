@@ -114,6 +114,28 @@ class RentBill extends Model
         return $this->effective_status === 'lunas';
     }
 
+    /**
+     * Tautan WhatsApp berisi pesan pengingat tagihan yang sopan dan lengkap (nominal, jatuh tempo, rekening).
+     * Null bila tagihan sudah lunas atau penghuni tidak punya nomor yang valid.
+     */
+    public function getReminderUrlAttribute(): ?string
+    {
+        if ($this->status === 'lunas') {
+            return null;
+        }
+
+        $user = $this->tenantProfile?->user;
+        $pay = config('kos.payment');
+        $due = $this->due_date ? $this->due_date->translatedFormat('d F Y') : '-';
+
+        $message = "Halo {$user?->name}, ini pengingat dari " . config('kos.name') . ".\n"
+            . "Tagihan sewa {$this->period_label} sebesar {$this->formatted_amount} jatuh tempo {$due}.\n"
+            . "Pembayaran ke {$pay['bank_name']} {$pay['account_no']} a.n. {$pay['account_name']}. "
+            . "Setelah transfer, mohon unggah bukti di aplikasi. Terima kasih.";
+
+        return \App\Support\Phone::whatsappUrl($user?->phone, $message);
+    }
+
     public function getDaysOverdueAttribute(): int
     {
         if (!$this->due_date) {

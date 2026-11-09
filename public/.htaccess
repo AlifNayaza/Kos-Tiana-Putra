@@ -1,3 +1,15 @@
+# Kompres teks (HTML/CSS/JS/JSON/SVG): menghemat 70-85% bandwidth
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/plain text/javascript application/javascript application/json image/svg+xml
+</IfModule>
+
+# Aset hasil build Vite memakai nama berhash, jadi aman di-cache selamanya oleh peramban
+<IfModule mod_headers.c>
+    <If "%{REQUEST_URI} =~ m#^/build/#">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </If>
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes

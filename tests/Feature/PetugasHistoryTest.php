@@ -7,12 +7,13 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\CreatesKosFixtures;
 use Tests\TestCase;
 
 class PetugasHistoryTest extends TestCase
 {
-    use DatabaseTransactions;
+    use RefreshDatabase, CreatesKosFixtures;
 
     protected User $petugas;
     protected User $otherPetugas;
@@ -23,7 +24,7 @@ class PetugasHistoryTest extends TestCase
     {
         parent::setUp();
 
-        $this->petugas = User::where('role', 'petugas')->first() ?? User::factory()->create(['role' => 'petugas']);
+        $this->petugas = $this->makeUser('petugas');
         $this->otherPetugas = User::firstOrCreate(
             ['email' => 'cadangan@kostiana.com'],
             [
@@ -32,8 +33,8 @@ class PetugasHistoryTest extends TestCase
                 'role' => 'petugas',
             ]
         );
-        $this->penghuni = User::where('role', 'penghuni')->first() ?? User::factory()->create(['role' => 'penghuni']);
-        $this->catalogItem = CatalogItem::first();
+        $this->penghuni = $this->makeTenant();
+        $this->catalogItem = $this->makeGalon();
     }
 
     /**

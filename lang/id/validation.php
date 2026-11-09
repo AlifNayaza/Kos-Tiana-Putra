@@ -1,0 +1,108 @@
+<?php
+
+/*
+ * Pesan validasi berbahasa Indonesia.
+ * Tanpa berkas ini pengguna melihat kode mentah seperti "validation.min.numeric".
+ */
+return [
+    'accepted' => ':attribute harus disetujui.',
+    'array' => ':attribute harus berupa daftar.',
+    'boolean' => ':attribute harus bernilai ya atau tidak.',
+    'confirmed' => 'Konfirmasi :attribute tidak cocok.',
+    'current_password' => 'Kata sandi saat ini tidak sesuai.',
+    'date' => ':attribute bukan tanggal yang valid.',
+    'date_format' => ':attribute tidak sesuai format :format.',
+    'email' => ':attribute harus berupa alamat email yang valid, contoh: nama@email.com.',
+    'exists' => ':attribute yang dipilih tidak ditemukan.',
+    'file' => ':attribute harus berupa berkas.',
+    'image' => ':attribute harus berupa gambar.',
+    'in' => ':attribute yang dipilih tidak valid.',
+    'integer' => ':attribute harus berupa angka bulat.',
+    'mimes' => ':attribute harus berupa berkas bertipe: :values.',
+    'numeric' => ':attribute harus berupa angka.',
+    'regex' => 'Format :attribute tidak valid.',
+    'required' => ':attribute wajib diisi.',
+    'same' => ':attribute harus sama dengan :other.',
+    'string' => ':attribute harus berupa teks.',
+    'unique' => ':attribute sudah dipakai, gunakan yang lain.',
+    'uploaded' => ':attribute gagal diunggah.',
+    'url' => 'Format :attribute tidak valid.',
+
+    'between' => [
+        'array' => ':attribute harus memiliki :min sampai :max item.',
+        'file' => 'Ukuran :attribute harus antara :min dan :max KB.',
+        'numeric' => ':attribute harus antara :min dan :max.',
+        'string' => ':attribute harus antara :min dan :max karakter.',
+    ],
+    'max' => [
+        'array' => ':attribute tidak boleh lebih dari :max item.',
+        'file' => 'Ukuran :attribute tidak boleh lebih dari :max KB.',
+        'numeric' => ':attribute tidak boleh lebih dari :max.',
+        'string' => ':attribute tidak boleh lebih dari :max karakter.',
+    ],
+    'min' => [
+        'array' => ':attribute minimal :min item.',
+        'file' => 'Ukuran :attribute minimal :min KB.',
+        'numeric' => ':attribute minimal :min.',
+        'string' => ':attribute minimal :min karakter.',
+    ],
+    'size' => [
+        'array' => ':attribute harus berisi :size item.',
+        'file' => 'Ukuran :attribute harus :size KB.',
+        'numeric' => ':attribute harus :size.',
+        'string' => ':attribute harus :size karakter.',
+    ],
+    'password' => [
+        'letters' => ':attribute harus mengandung minimal satu huruf.',
+        'mixed' => ':attribute harus mengandung huruf besar dan huruf kecil.',
+        'numbers' => ':attribute harus mengandung minimal satu angka.',
+        'symbols' => ':attribute harus mengandung minimal satu simbol.',
+        'uncompromised' => ':attribute pernah bocor di internet, pilih kata sandi lain.',
+    ],
+
+    'custom' => [],
+
+    /*
+     * Nama kolom yang ramah dibaca; dipakai menggantikan nama teknis (mis. room_number).
+     */
+    'attributes' => [
+        'email' => 'Email',
+        'password' => 'Kata sandi baru',
+        'current_password' => 'Kata sandi saat ini',
+        'name' => 'Nama',
+        'phone' => 'Nomor telepon',
+        'room_id' => 'Kamar',
+        'room_number' => 'Nomor kamar',
+        'floor' => 'Lantai',
+        'type' => 'Tipe',
+        'size' => 'Ukuran',
+        'monthly_price' => 'Harga sewa bulanan',
+        'facilities' => 'Fasilitas',
+        'status' => 'Status',
+        'description' => 'Deskripsi',
+        'start_date' => 'Tanggal mulai huni',
+        'id_card_number' => 'Nomor KTP',
+        'occupation' => 'Pekerjaan',
+        'institution' => 'Kampus / kantor',
+        'emergency_contact_name' => 'Nama kontak darurat',
+        'emergency_contact_phone' => 'Telepon kontak darurat',
+        'category' => 'Kategori',
+        'price' => 'Harga',
+        'stock' => 'Stok',
+        'minimum_stock' => 'Stok minimum',
+        'unit' => 'Satuan',
+        'is_available' => 'Ketersediaan',
+        'month' => 'Bulan',
+        'year' => 'Tahun',
+        'due_date' => 'Tanggal jatuh tempo',
+        'quantity' => 'Jumlah',
+        'notes' => 'Catatan',
+        'items_json' => 'Keranjang',
+        'order_notes' => 'Catatan pesanan',
+        'payment_method' => 'Metode pembayaran',
+        'payment_proof' => 'Bukti pembayaran',
+        'catalog_item_id' => 'Menu',
+        'physical_count' => 'Hasil hitung fisik',
+        'quick_note' => 'Catatan',
+    ],
+];

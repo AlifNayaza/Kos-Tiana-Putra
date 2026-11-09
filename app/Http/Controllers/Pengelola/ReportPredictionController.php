@@ -10,7 +10,8 @@ use App\Models\RentBill;
 use App\Models\StockPrediction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
+use App\Jobs\RunStockPrediction;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 use App\Models\StockLog;
@@ -24,8 +25,18 @@ class ReportPredictionController extends Controller
     public function reportsIndex(Request $request)
     {
         $now = Carbon::now();
-        $selectedMonth = (int) $request->query('month', $now->month);
-        $selectedYear = (int) $request->query('year', $now->year);
+
+        // Periode tidak valid (mis. month=13) kembali ke bulan berjalan, bukan error 500.
+        $validated = validator($request->query(), [
+            'month' => ['nullable', 'integer', 'between:1,12'],
+            'year'  => ['nullable', 'integer', 'between:2020,2100'],
+        ])->valid();
+
+        $selectedMonth = (int) ($validated['month'] ?? $now->month);
+        $selectedYear = (int) ($validated['year'] ?? $now->year);
+
+        $periodStart = Carbon::create($selectedYear, $selectedMonth, 1)->startOfMonth();
+        $periodEnd = $periodStart->copy()->endOfMonth();
 
         // 1. Pemasukan Sewa Kamar pada Periode Terpilih
         $totalRentPaid = RentBill::where('year', $selectedYear)
@@ -38,21 +49,19 @@ class ReportPredictionController extends Controller
             ->whereIn('status', ['menunggu', 'menunggak'])
             ->sum('amount');
 
-        // 2. Penjualan Layanan Warkop & Galon pada Periode Terpilih
-        $completedOrdersQuery = Order::where('status', 'selesai')
-            ->whereYear('created_at', $selectedYear)
-            ->whereMonth('created_at', $selectedMonth);
+        // 2. Penjualan Layanan Warkop & Galon pada Periode Terpilih (rentang tanggal agar memakai indeks)
+        $completedOrders = fn () => Order::where('status', 'selesai')
+            ->whereBetween('created_at', [$periodStart, $periodEnd]);
 
-        $totalServiceSales = $completedOrdersQuery->sum('total_amount');
-        $totalOrdersCount = $completedOrdersQuery->count();
+        $totalServiceSales = $completedOrders()->sum('total_amount');
+        $totalOrdersCount = $completedOrders()->count();
 
         // 3. Rincian Penjualan per Kategori (Galon, Makanan, Minuman)
         $salesByCategory = DB::table('order_items')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->join('catalog_items', 'catalog_items.id', '=', 'order_items.catalog_item_id')
             ->where('orders.status', 'selesai')
-            ->whereYear('orders.created_at', $selectedYear)
-            ->whereMonth('orders.created_at', $selectedMonth)
+            ->whereBetween('orders.created_at', [$periodStart, $periodEnd])
             ->select('catalog_items.category', DB::raw('SUM(order_items.subtotal) as total_nominal'), DB::raw('SUM(order_items.quantity) as total_qty'))
             ->groupBy('catalog_items.category')
             ->get()
@@ -62,27 +71,24 @@ class ReportPredictionController extends Controller
         $foodSales = $salesByCategory['makanan']->total_nominal ?? 0;
         $drinkSales = $salesByCategory['minuman']->total_nominal ?? 0;
 
-        // 4. Data Grafik Tren Harian (1 s/d jumlah hari bulan terpilih)
-        $daysInMonth = Carbon::create($selectedYear, $selectedMonth, 1)->daysInMonth;
+        // 4. Data Grafik Tren Harian: satu query dikelompokkan per hari (bukan satu query per tanggal)
+        $salesPerDay = $completedOrders()
+            ->selectRaw('DATE(created_at) as sale_date, SUM(total_amount) as total')
+            ->groupBy('sale_date')
+            ->pluck('total', 'sale_date');
+
         $dailyLabels = [];
         $dailyServiceSales = [];
 
-        for ($d = 1; $d <= $daysInMonth; $d++) {
+        for ($d = 1; $d <= $periodStart->daysInMonth; $d++) {
             $dailyLabels[] = (string) $d;
-            $dayDate = Carbon::create($selectedYear, $selectedMonth, $d)->toDateString();
-
-            $daySum = Order::where('status', 'selesai')
-                ->whereDate('created_at', $dayDate)
-                ->sum('total_amount');
-
-            $dailyServiceSales[] = (int) $daySum;
+            $dailyServiceSales[] = (int) ($salesPerDay[$periodStart->copy()->day($d)->toDateString()] ?? 0);
         }
 
         // 5. Item Terlaris (Top Selling Items)
         $topItems = OrderItem::join('orders', 'orders.id', '=', 'order_items.order_id')
             ->where('orders.status', 'selesai')
-            ->whereYear('orders.created_at', $selectedYear)
-            ->whereMonth('orders.created_at', $selectedMonth)
+            ->whereBetween('orders.created_at', [$periodStart, $periodEnd])
             ->select('order_items.item_name', DB::raw('SUM(order_items.quantity) as total_sold'), DB::raw('SUM(order_items.subtotal) as total_omset'))
             ->groupBy('order_items.item_name')
             ->orderByDesc('total_sold')
@@ -114,11 +120,14 @@ class ReportPredictionController extends Controller
     public function predictionsIndex()
     {
         $predictions = StockPrediction::with('catalogItem')
+            ->whereIn('catalog_item_id', CatalogItem::select('id')) // item yang sudah dihapus tidak ikut
             ->orderByRaw("CASE WHEN status = 'kritis' THEN 1 WHEN status = 'waspada' THEN 2 ELSE 3 END")
             ->orderByDesc('recommended_restock_qty')
             ->get();
 
-        $lastCalculatedAt = $predictions->first()?->calculated_at;
+        $lastCalculatedAt = $predictions->max('calculated_at');
+        $isCalculating = (bool) Cache::get(RunStockPrediction::RUNNING_CACHE_KEY);
+        $lastError = Cache::get(RunStockPrediction::LAST_ERROR_CACHE_KEY);
 
         // Hitung estimasi modal belanja total (Saran Restock * Harga Satuan Katalog)
         $totalEstimatedBudget = $predictions->sum(fn($p) => $p->estimated_cost);
@@ -188,6 +197,8 @@ class ReportPredictionController extends Controller
         return view('pengelola.prediksi.index', compact(
             'predictions',
             'lastCalculatedAt',
+            'isCalculating',
+            'lastError',
             'stats',
             'shoppingChecklist',
             'waShoppingText',
@@ -196,36 +207,21 @@ class ReportPredictionController extends Controller
     }
 
     /**
-     * Tombol Aksi "Hitung Ulang Prediksi" (Mengeksekusi model Python melalui Artisan Command).
+     * Tombol Aksi "Hitung Ulang Prediksi": model Python dijalankan setelah respons dikirim
+     * (RunStockPrediction), sehingga halaman tidak menggantung menunggu proses selesai.
      */
     public function calculatePredictions()
     {
-        try {
-            $exitCode = Artisan::call('stok:prediksi');
-            $output = Artisan::output();
-
-            if ($exitCode === 0) {
-                return redirect()->route('pengelola.prediksi.index')
-                    ->with('success', 'Model Machine Learning Python berhasil melatih data penjualan historis dan memperbarui estimasi stok 7 hari ke depan!');
-            } else {
-                \Illuminate\Support\Facades\Log::error("Gagal stok:prediksi (Exit {$exitCode}):\n{$output}");
-
-                $msg = 'Gagal memperbarui prediksi stok.';
-                if ($output) {
-                    $cleaned = trim(strip_tags($output));
-                    if (str_contains($cleaned, 'Gagal mengeksekusi') || str_contains($cleaned, 'Error') || str_contains($cleaned, 'Exception')) {
-                        $msg .= ' Detail: ' . \Illuminate\Support\Str::limit($cleaned, 150);
-                    }
-                }
-
-                return redirect()->route('pengelola.prediksi.index')
-                    ->with('error', $msg);
-            }
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Exception stok:prediksi: " . $e->getMessage());
+        if (Cache::get(RunStockPrediction::RUNNING_CACHE_KEY)) {
             return redirect()->route('pengelola.prediksi.index')
-                ->with('error', 'Terjadi kesalahan saat memanggil model Python: ' . $e->getMessage());
+                ->with('info', 'Perhitungan prediksi sedang berjalan. Muat ulang halaman beberapa saat lagi.');
         }
+
+        Cache::put(RunStockPrediction::RUNNING_CACHE_KEY, true, now()->addMinutes(5));
+        RunStockPrediction::dispatchAfterResponse();
+
+        return redirect()->route('pengelola.prediksi.index')
+            ->with('success', 'Prediksi stok sedang dihitung di latar belakang. Muat ulang halaman dalam beberapa detik untuk melihat hasilnya.');
     }
 
     /**

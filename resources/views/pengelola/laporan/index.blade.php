@@ -48,7 +48,7 @@
             <div class="mt-2 text-2xl font-extrabold text-brand tabular-nums">
                 Rp {{ number_format($grandTotalRevenue, 0, ',', '.') }}
             </div>
-            <p class="text-[11px] text-ink-faint mt-1">Gabungan sewa kamar lunas + omzet warkop</p>
+            <p class="text-2xs text-ink-faint mt-1">Gabungan sewa kamar lunas + omzet warkop</p>
         </div>
 
         <!-- Card 2: Sewa Kamar Terkumpul -->
@@ -57,7 +57,7 @@
             <div class="mt-2 text-2xl font-extrabold text-done tabular-nums">
                 Rp {{ number_format($totalRentPaid, 0, ',', '.') }}
             </div>
-            <p class="text-[11px] text-ink-faint mt-1">
+            <p class="text-2xs text-ink-faint mt-1">
                 Tertunda: <strong class="text-alert tabular-nums">Rp {{ number_format($totalRentPending, 0, ',', '.') }}</strong>
             </p>
         </div>
@@ -65,10 +65,10 @@
         <!-- Card 3: Penjualan Warkop & Galon -->
         <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex flex-col justify-between">
             <span class="text-xs font-semibold text-ink-soft uppercase tracking-wider">Omzet Layanan Kamar & Galon</span>
-            <div class="mt-2 text-2xl font-extrabold text-ochre tabular-nums">
+            <div class="mt-2 text-2xl font-extrabold text-ochre-ink tabular-nums">
                 Rp {{ number_format($totalServiceSales, 0, ',', '.') }}
             </div>
-            <p class="text-[11px] text-ink-faint mt-1">
+            <p class="text-2xs text-ink-faint mt-1">
                 Dari <strong class="text-ink tabular-nums">{{ $totalOrdersCount }}</strong> pesanan selesai
             </p>
         </div>
@@ -170,7 +170,7 @@
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs">
+                <table class="w-full text-left text-xs table-stack">
                     <thead>
                         <tr class="bg-canvas border-b border-line text-ink-soft uppercase tracking-wider font-semibold">
                             <th class="py-3 px-4 sm:px-6">Peringkat</th>
@@ -182,20 +182,20 @@
                     <tbody class="divide-y divide-line">
                         @forelse($topItems as $index => $item)
                             <tr class="hover:bg-canvas transition-colors">
-                                <td class="py-3 px-4 sm:px-6">
+                                <td class="py-3 px-4 sm:px-6" data-label="Peringkat"><div class="cell-value">
                                     <span class="w-6 h-6 rounded-full inline-flex items-center justify-center font-bold text-xs {{ $index === 0 ? 'bg-ochre-wash text-ochre' : 'bg-canvas text-ink-soft border border-line' }}">
                                         {{ $index + 1 }}
                                     </span>
-                                </td>
-                                <td class="py-3 px-4 font-bold text-ink">
+                                </div></td>
+                                <td class="py-3 px-4 font-bold text-ink" data-label="Item"><div class="cell-value">
                                     {{ $item->item_name }}
-                                </td>
-                                <td class="py-3 px-4 text-center font-extrabold text-ink tabular-nums">
+                                </div></td>
+                                <td class="py-3 px-4 text-center font-extrabold text-ink tabular-nums" data-label="Terjual"><div class="cell-value">
                                     {{ $item->total_sold }}
-                                </td>
-                                <td class="py-3 px-4 sm:px-6 text-right font-extrabold text-brand tabular-nums">
+                                </div></td>
+                                <td class="py-3 px-4 sm:px-6 text-right font-extrabold text-brand tabular-nums" data-label="Omzet"><div class="cell-value">
                                     Rp {{ number_format($item->total_omset, 0, ',', '.') }}
-                                </td>
+                                </div></td>
                             </tr>
                         @empty
                             <tr>
@@ -215,6 +215,7 @@
 @endsection
 
 @push('scripts')
+@include('layouts.partials.charts-script')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const ctx = document.getElementById('dailySalesChart');

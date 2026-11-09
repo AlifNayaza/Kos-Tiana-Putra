@@ -33,7 +33,7 @@ class OrderItem extends Model
 
     public function catalogItem(): BelongsTo
     {
-        return $this->belongsTo(CatalogItem::class);
+        return $this->belongsTo(CatalogItem::class)->withTrashed();
     }
 
     public function getFormattedUnitPriceAttribute(): string

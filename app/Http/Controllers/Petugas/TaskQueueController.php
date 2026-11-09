@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Petugas;
 
 use App\Http\Controllers\Controller;
-use App\Models\AppNotification;
 use App\Models\Order;
+use App\Services\OrderService;
+use DomainException;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +13,10 @@ use Illuminate\Support\Facades\DB;
 
 class TaskQueueController extends Controller
 {
+    public function __construct(private OrderService $orders)
+    {
+    }
+
     /**
      * Tampilkan antrean tugas operasional harian petugas (FR-08).
      */
@@ -20,11 +25,16 @@ class TaskQueueController extends Controller
         $today = Carbon::today();
 
         // Metrik Ringkasan Beban Kerja Hari Ini
+        $active = Order::selectRaw('status, COUNT(*) as total')
+            ->whereIn('status', ['menunggu', 'diproses', 'diantar'])
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
         $metrics = [
-            'menunggu'   => Order::where('status', 'menunggu')->count(),
-            'diproses'   => Order::where('status', 'diproses')->count(),
-            'diantar'    => Order::where('status', 'diantar')->count(),
-            'selesai'    => Order::where('status', 'selesai')->whereDate('completed_at', $today)->count(),
+            'menunggu'   => (int) ($active['menunggu'] ?? 0),
+            'diproses'   => (int) ($active['diproses'] ?? 0),
+            'diantar'    => (int) ($active['diantar'] ?? 0),
+            'selesai'    => Order::where('status', 'selesai')->where('completed_at', '>=', $today)->where('completed_at', '<', $today->copy()->addDay())->count(),
         ];
 
         Carbon::setLocale('id');
@@ -50,70 +60,33 @@ class TaskQueueController extends Controller
             return $order;
         });
 
-        return view('petugas.dashboard', compact('orders', 'metrics'));
+        $signature = Order::activitySignature();
+
+        return view('petugas.dashboard', compact('orders', 'metrics', 'signature'));
+    }
+
+    /**
+     * Tanda perubahan antrean (JSON super kecil) untuk polling hemat: lihat Order::activitySignature().
+     */
+    public function signal()
+    {
+        return response()->json(['sig' => Order::activitySignature()])->header('Cache-Control', 'no-store');
     }
 
     /**
      * Perbarui status pesanan dengan tombol One-Tap Contextual Action (FR-08 & FR-12).
+     * Hanya transisi berurutan yang diizinkan; lihat OrderService::NEXT_STATUS.
      */
     public function updateStatus(Request $request, Order $order)
     {
-        $currentStatus = $order->status;
-        $petugas = Auth::user();
+        $request->validate([
+            'status' => ['nullable', 'in:diproses,diantar,selesai'],
+        ]);
 
-        // Tentukan transisi status berikutnya
-        $targetStatus = $request->input('status');
-        if (!$targetStatus) {
-            $targetStatus = match ($currentStatus) {
-                'menunggu' => 'diproses',
-                'diproses' => 'diantar',
-                'diantar'  => 'selesai',
-                default    => null,
-            };
-        }
-
-        if (!$targetStatus || !in_array($targetStatus, ['diproses', 'diantar', 'selesai'])) {
-            return redirect()->back()->with('error', 'Transisi status tidak valid untuk pesanan ini.');
-        }
-
-        // Simpan pembaruan status
-        $updateData = [
-            'status'       => $targetStatus,
-            'processed_by' => $petugas->id,
-        ];
-
-        if ($targetStatus === 'selesai') {
-            $updateData['completed_at'] = now();
-            $updateData['payment_status'] = 'lunas';
-        }
-
-        $order->update($updateData);
-
-        // Otomatis buat notifikasi ke penghuni pemilik pesanan (FR-12)
-        $notifMap = [
-            'diproses' => [
-                'title'   => 'Pesanan Sedang Diproses',
-                'message' => "Pesanan #{$order->order_code} sedang disiapkan oleh petugas ({$petugas->name}).",
-            ],
-            'diantar'  => [
-                'title'   => 'Pesanan Sedang Diantar!',
-                'message' => "Pesanan #{$order->order_code} sedang diantar menuju ke {$order->room_number}. Mohon bersiap menerima.",
-            ],
-            'selesai'  => [
-                'title'   => 'Pesanan Telah Selesai',
-                'message' => "Pesanan #{$order->order_code} telah selesai diantar ke {$order->room_number}. Terima kasih!",
-            ],
-        ];
-
-        if (isset($notifMap[$targetStatus])) {
-            AppNotification::create([
-                'user_id'    => $order->user_id,
-                'title'      => $notifMap[$targetStatus]['title'],
-                'message'    => $notifMap[$targetStatus]['message'],
-                'type'       => 'order',
-                'action_url' => route('penghuni.pesanan'),
-                'is_read'    => false,
-            ]);
+        try {
+            $updated = $this->orders->advance($order->id, Auth::user(), $request->input('status'));
+        } catch (DomainException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
         }
 
         $statusLabels = [
@@ -122,7 +95,7 @@ class TaskQueueController extends Controller
             'selesai'  => 'Selesai & Lunas',
         ];
 
-        return redirect()->back()->with('success', "Status pesanan #{$order->order_code} ({$order->room_number}) berhasil diperbarui menjadi {$statusLabels[$targetStatus]}.");
+        return redirect()->back()->with('success', "Status pesanan #{$updated->order_code} ({$updated->room_number}) berhasil diperbarui menjadi {$statusLabels[$updated->status]}.");
     }
 
     /**
@@ -131,14 +104,20 @@ class TaskQueueController extends Controller
     public function history(Request $request)
     {
         Carbon::setLocale('id');
+        // Tanggal hanya diterima bila valid (Y-m-d); nilai rusak diabaikan agar halaman tidak error 500.
         $dateFilter = $request->query('date');
+        $day = rescue(fn () => Carbon::createFromFormat('!Y-m-d', (string) $dateFilter), null, false);
+        if (!$day) {
+            $dateFilter = null;
+        }
         $search = $request->query('q');
 
         $query = Order::with(['items', 'user', 'processor'])
             ->whereIn('status', ['selesai', 'batal']);
 
         if ($dateFilter) {
-            $query->whereDate('completed_at', $dateFilter);
+            // Rentang waktu (bukan DATE(kolom)) agar indeks completed_at dapat dipakai.
+            $query->where('completed_at', '>=', $day)->where('completed_at', '<', $day->copy()->addDay());
         }
 
         if ($search) {
@@ -148,11 +127,12 @@ class TaskQueueController extends Controller
             });
         }
 
-        $orders = $query->latest('completed_at')->latest('updated_at')->paginate(15);
+        $orders = $query->latest('completed_at')->latest('updated_at')->paginate(15)->withQueryString();
 
         // Rekapitulasi pesanan selesai hari ini berdasarkan metode pembayaran (Tunai vs Non-Tunai/QRIS)
         $todayAggregates = Order::where('status', 'selesai')
-            ->whereDate('completed_at', Carbon::today())
+            ->where('completed_at', '>=', Carbon::today())
+            ->where('completed_at', '<', Carbon::tomorrow())
             ->select('payment_method', DB::raw('SUM(total_amount) as total_sum'), DB::raw('COUNT(*) as total_count'))
             ->groupBy('payment_method')
             ->get();
@@ -163,8 +143,7 @@ class TaskQueueController extends Controller
 
         foreach ($todayAggregates as $agg) {
             $todayCompletedCount += (int) $agg->total_count;
-            $method = strtolower($agg->payment_method ?? '');
-            if (str_contains($method, 'tunai') || str_contains($method, 'cash') || empty($agg->payment_method)) {
+            if (Order::isCashMethod($agg->payment_method)) {
                 $todayCash += (int) $agg->total_sum;
             } else {
                 $todayNonCash += (int) $agg->total_sum;

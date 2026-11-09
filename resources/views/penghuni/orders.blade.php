@@ -11,13 +11,65 @@
         this.orderToCancelId = id;
         this.orderToCancelCode = code;
         this.cancelConfirmOpen = true;
+    },
+
+    // Pesan lagi: isi keranjang dengan menu yang sama lalu buka katalog (harga & stok dicek ulang di sana).
+    reorder(items) {
+        try { localStorage.setItem('kos-cart-{{ Auth::id() }}', JSON.stringify(items)); } catch (e) {}
+        window.location.href = '{{ route('penghuni.katalog') }}';
+    },
+
+    // Status pesanan diperbarui otomatis tiap 20 detik selama halaman terlihat.
+    sig: @js($signature),
+
+    init() {
+        setInterval(() => {
+            if (!document.hidden && this.currentTab === 'aktif') this.checkActive();
+        }, 20000);
+    },
+
+    // Polling hemat: tanya tanda perubahan (JSON beberapa byte); unduh HTML penuh hanya bila berubah.
+    checkActive() {
+        fetch('{{ route('penghuni.pesanan.signal') }}', { headers: { 'Accept': 'application/json' } })
+            .then(res => res.json())
+            .then(data => { if (data.sig !== this.sig) this.refreshActive(); })
+            .catch(() => {});
+    },
+
+    refreshActive() {
+        fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(res => res.text())
+            .then(html => {
+                const fresh = new DOMParser().parseFromString(html, 'text/html').getElementById('orders-active');
+                const current = document.getElementById('orders-active');
+                if (!fresh || !current) return;
+                if (fresh.dataset.sig) this.sig = fresh.dataset.sig;
+
+                const before = {};
+                current.querySelectorAll('[data-order-code]').forEach(e => { before[e.dataset.orderCode] = e.dataset.orderStatus; });
+                const labels = { diproses: 'sedang disiapkan', diantar: 'sedang diantar ke kamar Anda' };
+                const after = [...fresh.querySelectorAll('[data-order-code]')];
+
+                const changed = after.filter(e => before[e.dataset.orderCode] && before[e.dataset.orderCode] !== e.dataset.orderStatus);
+                const finished = Object.keys(before).filter(code => !after.some(e => e.dataset.orderCode === code));
+
+                if (changed.length === 0 && finished.length === 0) return;
+
+                current.innerHTML = fresh.innerHTML;
+                changed.forEach(e => window.kosToast('Pesanan #' + e.dataset.orderCode + ' ' + (labels[e.dataset.orderStatus] || 'diperbarui'), 'info'));
+                if (finished.length > 0) {
+                    window.kosToast('Pesanan Anda sudah selesai. Terima kasih!', 'success');
+                    setTimeout(() => window.location.reload(), 2500);
+                }
+            })
+            .catch(() => {});
     }
 }">
 
     <!-- Header Halaman -->
     <div class="flex items-center justify-between pb-1">
         <div>
-            <h1 class="text-base sm:text-lg font-bold text-ink">Pesanan Saya</h1>
+            <h1 class="text-3xl text-brand-deep">Pesanan Saya</h1>
             <p class="text-xs text-ink-soft">Pantau status antrean dan riwayat pemesanan kamar</p>
         </div>
     </div>
@@ -30,7 +82,7 @@
                 class="min-h-[44px] rounded-lg transition-colors flex items-center justify-center gap-2">
             <span>Sedang Berjalan</span>
             @if($activeOrders->count() > 0)
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-wash text-brand tabular-nums">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold bg-brand-wash text-brand tabular-nums">
                     {{ $activeOrders->count() }}
                 </span>
             @endif
@@ -42,7 +94,7 @@
                 class="min-h-[44px] rounded-lg transition-colors flex items-center justify-center gap-2">
             <span>Riwayat Selesai</span>
             @if($completedOrders->total() > 0)
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-line text-ink-soft tabular-nums">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-medium bg-line text-ink-soft tabular-nums">
                     {{ $completedOrders->total() }}
                 </span>
             @endif
@@ -52,9 +104,9 @@
     <!-- ============================================================== -->
     <!-- TAB 1: PESANAN SEDANG BERJALAN                                 -->
     <!-- ============================================================== -->
-    <div x-show="currentTab === 'aktif'" class="space-y-4">
+    <div id="orders-active" data-sig="{{ $signature }}" x-show="currentTab === 'aktif'" class="space-y-4" aria-live="polite">
         @forelse($activeOrders as $order)
-            <div class="bg-surface rounded-xl border border-line p-4 sm:p-5 text-ink shadow-xs space-y-4">
+            <div data-order-code="{{ $order->order_code }}" data-order-status="{{ $order->status }}" class="bg-surface rounded-xl border border-line p-4 sm:p-5 text-ink shadow-xs space-y-4">
                 
                 <!-- Baris Atas: ID & Status -->
                 <div class="flex items-start justify-between gap-3 pb-3 border-b border-line">
@@ -62,19 +114,19 @@
                         <div class="flex items-center gap-2">
                             <span class="font-mono text-xs font-bold text-ink">{{ $order->order_code }}</span>
                             @if($order->order_type === 'quick_galon')
-                                <span class="text-[10px] font-medium text-ink-soft bg-canvas px-2 py-0.5 rounded-full border border-line">
+                                <span class="text-2xs font-medium text-ink-soft bg-canvas px-2 py-0.5 rounded-full border border-line">
                                     Galon
                                 </span>
                             @endif
                         </div>
-                        <p class="text-[11px] text-ink-faint mt-0.5">
+                        <p class="text-2xs text-ink-faint mt-0.5">
                             {{ $order->created_at->translatedFormat('d M Y, H:i') }} &bull; Diantar ke {{ $order->room_number }}
                         </p>
                     </div>
 
                     <div class="text-right flex-shrink-0">
                         <x-status-badge :status="$order->status" />
-                        <span class="block text-[11px] text-ink-faint mt-1">
+                        <span class="block text-2xs text-ink-faint mt-1">
                             diperbarui {{ $order->updated_at->locale('id')->diffForHumans() }}
                         </span>
                     </div>
@@ -102,7 +154,7 @@
                     <div class="border-t border-dashed border-line pt-2.5 flex items-center justify-between">
                         <div>
                             <span class="font-bold text-ink block">Total</span>
-                            <span class="text-[11px] text-ink-faint">Metode: {{ $order->payment_method }}</span>
+                            <span class="text-2xs text-ink-faint">Metode: {{ $order->payment_method }}</span>
                         </div>
                         <span class="text-base font-bold text-ink tabular-nums whitespace-nowrap">
                             {{ $order->formatted_total }}
@@ -113,7 +165,7 @@
                 <!-- Catatan untuk Petugas (TAMPIL SEKALI) -->
                 @if($order->notes)
                     <div class="p-3 bg-canvas rounded-xl border border-line text-xs text-ink-soft">
-                        <span class="font-semibold text-ink block text-[11px] mb-0.5">Catatan:</span>
+                        <span class="font-semibold text-ink block text-2xs mb-0.5">Catatan:</span>
                         <p class="leading-relaxed">{{ $order->notes }}</p>
                     </div>
                 @endif
@@ -149,7 +201,7 @@
                 <div class="flex items-start justify-between gap-3 pb-2.5 border-b border-line">
                     <div>
                         <span class="font-mono text-xs font-bold text-ink">{{ $order->order_code }}</span>
-                        <p class="text-[11px] text-ink-faint mt-0.5">
+                        <p class="text-2xs text-ink-faint mt-0.5">
                             {{ $order->created_at->translatedFormat('d M Y, H:i') }}
                         </p>
                     </div>
@@ -174,9 +226,18 @@
 
                 <!-- Catatan Tampil Sekali jika ada -->
                 @if($order->notes)
-                    <p class="text-[11px] text-ink-soft bg-canvas rounded-lg p-2 border border-line">
+                    <p class="text-2xs text-ink-soft bg-canvas rounded-lg p-2 border border-line">
                         Catatan: {{ $order->notes }}
                     </p>
+                @endif
+
+                @if($order->status === 'selesai')
+                    <button type="button"
+                            @click="reorder(@js($order->items->map(fn ($i) => ['id' => $i->catalog_item_id, 'quantity' => $i->quantity])->values()))"
+                            class="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl border border-brand/30 bg-brand-wash text-brand-deep text-xs font-bold hover:bg-brand hover:text-white transition-colors">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Pesan lagi
+                    </button>
                 @endif
             </div>
         @empty

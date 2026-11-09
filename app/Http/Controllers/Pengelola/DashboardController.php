@@ -9,6 +9,7 @@ use App\Models\RentBill;
 use App\Models\Room;
 use App\Models\StockPrediction;
 use App\Models\TenantProfile;
+use App\Support\SqlDate;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -23,30 +24,51 @@ class DashboardController extends Controller
         $currentMonth = $now->month;
         $currentYear = $now->year;
 
-        // 1. Metrik Okupansi & Penghuni
-        $roomsCount = Room::count();
-        $occupiedRoomsCount = Room::where('status', 'terisi')->count();
-        $availableRoomsCount = Room::where('status', 'tersedia')->count();
-        $repairRoomsCount = Room::where('status', 'perbaikan')->count();
+        // 1. Metrik Okupansi & Penghuni: satu query dikelompokkan per status (bukan 4 query count terpisah)
+        $roomsByStatus = Room::selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status');
+        $roomsCount = (int) $roomsByStatus->sum();
+        $occupiedRoomsCount = (int) ($roomsByStatus['terisi'] ?? 0);
+        $availableRoomsCount = (int) ($roomsByStatus['tersedia'] ?? 0);
+        $repairRoomsCount = (int) ($roomsByStatus['perbaikan'] ?? 0);
         $tenantsCount = TenantProfile::where('is_active', true)->count();
 
-        // 2. Metrik Keuangan Bulan Berjalan
-        $rentIncomeThisMonth = RentBill::where('year', $currentYear)
-            ->where('month', $currentMonth)
-            ->where('status', 'lunas')
-            ->sum('amount');
+        // 2. Pendapatan 6 bulan terakhir: satu query sewa + satu query penjualan, dikelompokkan per bulan
+        $months = collect(range(5, 0))->map(fn ($i) => $now->copy()->startOfMonth()->subMonths($i));
+        $windowStart = $months->first();
 
-        $pendingRentThisMonth = RentBill::where('year', $currentYear)
+        $rentByMonth = RentBill::selectRaw('year, month, SUM(amount) as total')
+            ->where('status', 'lunas')
+            ->where('year', '>=', $windowStart->year)
+            ->groupBy('year', 'month')
+            ->get()
+            ->mapWithKeys(fn ($r) => [sprintf('%04d-%02d', $r->year, $r->month) => (int) $r->total]);
+
+        $salesExpr = SqlDate::yearMonth('created_at');
+        $salesByMonth = Order::selectRaw("{$salesExpr} as ym, SUM(total_amount) as total")
+            ->where('status', 'selesai')
+            ->where('created_at', '>=', $windowStart)
+            ->groupBy('ym')
+            ->pluck('total', 'ym');
+
+        $chartLabels = [];
+        $rentSeries = [];
+        $salesSeries = [];
+        foreach ($months as $monthDate) {
+            $key = $monthDate->format('Y-m');
+            $chartLabels[] = $monthDate->translatedFormat('M Y');
+            $rentSeries[] = (int) ($rentByMonth[$key] ?? 0);
+            $salesSeries[] = (int) ($salesByMonth[$key] ?? 0);
+        }
+
+        $thisMonth = $now->format('Y-m');
+        $rentIncomeThisMonth = $rentByMonth[$thisMonth] ?? 0;
+        $serviceSalesThisMonth = (int) ($salesByMonth[$thisMonth] ?? 0);
+        $totalIncomeThisMonth = $rentIncomeThisMonth + $serviceSalesThisMonth;
+
+        $pendingRentThisMonth = (int) RentBill::where('year', $currentYear)
             ->where('month', $currentMonth)
             ->whereIn('status', ['menunggu', 'menunggak'])
             ->sum('amount');
-
-        $serviceSalesThisMonth = Order::where('status', 'selesai')
-            ->whereYear('created_at', $currentYear)
-            ->whereMonth('created_at', $currentMonth)
-            ->sum('total_amount');
-
-        $totalIncomeThisMonth = $rentIncomeThisMonth + $serviceSalesThisMonth;
 
         // 3. Metrik Operasional Harian
         $activeOrdersCount = Order::whereIn('status', ['menunggu', 'diproses', 'diantar'])->count();
@@ -55,31 +77,6 @@ class DashboardController extends Controller
             ->whereIn('status', ['menunggu', 'menunggak'])
             ->where('due_date', '<', $now->toDateString())
             ->get();
-
-        // 4. Data Visualisasi Grafik Chart.js (6 Bulan Terakhir)
-        $chartLabels = [];
-        $rentSeries = [];
-        $salesSeries = [];
-
-        for ($i = 5; $i >= 0; $i--) {
-            $monthDate = $now->copy()->subMonths($i);
-            $m = $monthDate->month;
-            $y = $monthDate->year;
-
-            $chartLabels[] = $monthDate->translatedFormat('M Y');
-
-            $mRent = RentBill::where('year', $y)
-                ->where('month', $m)
-                ->where('status', 'lunas')
-                ->sum('amount');
-            $rentSeries[] = (int) $mRent;
-
-            $mSales = Order::where('status', 'selesai')
-                ->whereYear('created_at', $y)
-                ->whereMonth('created_at', $m)
-                ->sum('total_amount');
-            $salesSeries[] = (int) $mSales;
-        }
 
         // 5. Pesanan Layanan Terbaru
         $recentOrders = Order::with(['items', 'user'])

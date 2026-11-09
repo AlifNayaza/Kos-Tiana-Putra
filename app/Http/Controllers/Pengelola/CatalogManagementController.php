@@ -34,12 +34,16 @@ class CatalogManagementController extends Controller
 
         $items = $query->orderBy('category')->orderBy('name')->get();
 
+        $byCategory = CatalogItem::selectRaw('category, COUNT(*) as total, SUM(CASE WHEN stock <= minimum_stock THEN 1 ELSE 0 END) as low')
+            ->groupBy('category')
+            ->get()
+            ->keyBy('category');
         $stats = [
-            'total'   => CatalogItem::count(),
-            'galon'   => CatalogItem::where('category', 'galon')->count(),
-            'makanan' => CatalogItem::where('category', 'makanan')->count(),
-            'minuman' => CatalogItem::where('category', 'minuman')->count(),
-            'menipis' => CatalogItem::whereColumn('stock', '<=', 'minimum_stock')->count(),
+            'total'   => (int) $byCategory->sum('total'),
+            'galon'   => (int) ($byCategory['galon']->total ?? 0),
+            'makanan' => (int) ($byCategory['makanan']->total ?? 0),
+            'minuman' => (int) ($byCategory['minuman']->total ?? 0),
+            'menipis' => (int) $byCategory->sum('low'),
         ];
 
         return view('pengelola.katalog.index', compact('items', 'stats', 'category', 'search'));
@@ -109,15 +113,20 @@ class CatalogManagementController extends Controller
     }
 
     /**
-     * Hapus item dari katalog.
+     * Hapus item dari katalog. Penghapusan bersifat lunak (soft delete):
+     * riwayat pesanan, audit stok, dan laporan penjualan tetap utuh.
      */
     public function destroy(CatalogItem $katalog)
     {
         $name = $katalog->name;
-        $katalog->delete();
+
+        DB::transaction(function () use ($katalog) {
+            $katalog->stockPredictions()->delete();
+            $katalog->delete();
+        });
 
         return redirect()->route('pengelola.katalog.index')
-            ->with('success', "Item \"{$name}\" telah dihapus dari katalog.");
+            ->with('success', "Item \"{$name}\" telah dihapus dari katalog. Riwayat pesanan dan stoknya tetap tersimpan.");
     }
 
     /**

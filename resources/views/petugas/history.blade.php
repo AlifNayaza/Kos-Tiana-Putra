@@ -2,11 +2,7 @@
 
 @section('content')
 @php
-    $isCash = function ($method) {
-        if (!$method) return true;
-        $m = strtolower($method);
-        return str_contains($m, 'tunai') || str_contains($m, 'cash');
-    };
+    $isCash = fn ($method) => \App\Models\Order::isCashMethod($method);
 
     $formatMethod = function ($method) use ($isCash) {
         if ($isCash($method)) return 'Tunai';
@@ -29,7 +25,7 @@
     <!-- ============================================================== -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-0.5">
         <div>
-            <h1 class="text-base sm:text-lg font-bold text-ink leading-tight">Riwayat</h1>
+            <h1 class="text-3xl text-brand-deep leading-tight">Riwayat</h1>
             <p class="text-xs text-ink-soft mt-0.5">
                 @if($todayCompletedCount > 0)
                     Tunai hari ini <strong class="font-bold text-ink"><x-price :amount="$todayCash" /></strong> &middot; <span class="text-ink-soft">QRIS <x-price :amount="$todayNonCash" /></span>
@@ -133,15 +129,15 @@
                 <div class="flex items-center justify-between gap-2 px-1">
                     <div class="flex items-center gap-1.5 min-w-0">
                         <h2 class="text-xs font-bold text-ink-soft tracking-wider uppercase truncate">{{ $dateLabel }}</h2>
-                        <span class="text-[11px] font-semibold text-ink-faint tabular-nums shrink-0">({{ $ordersInGroup->count() }})</span>
+                        <span class="text-2xs font-semibold text-ink-faint tabular-nums shrink-0">({{ $ordersInGroup->count() }})</span>
                     </div>
 
                     <div class="flex items-center gap-1.5 text-xs text-right shrink-0">
                         <span class="font-bold text-ink whitespace-nowrap">
-                            <x-price :amount="$groupCash" /> <span class="text-[11px] font-normal text-ink-soft">tunai</span>
+                            <x-price :amount="$groupCash" /> <span class="text-2xs font-normal text-ink-soft">tunai</span>
                         </span>
                         @if($groupNonCash > 0)
-                            <span class="text-[11px] text-ink-faint whitespace-nowrap">
+                            <span class="text-2xs text-ink-faint whitespace-nowrap">
                                 + <x-price :amount="$groupNonCash" /> QRIS
                             </span>
                         @endif
@@ -211,7 +207,7 @@
 
                                         <!-- Ikon catatan & potongan teks pendek bila ada catatan -->
                                         @if($order->notes)
-                                            <span class="inline-flex items-center gap-1 text-[11px] text-ink-faint shrink-0 max-w-[110px] sm:max-w-[150px]" title="{{ $order->notes }}">
+                                            <span class="inline-flex items-center gap-1 text-2xs text-ink-faint shrink-0 max-w-[110px] sm:max-w-[150px]" title="{{ $order->notes }}">
                                                 <svg class="w-3 h-3 text-ink-faint shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
                                                 </svg>
@@ -221,7 +217,7 @@
 
                                         <!-- Penanda metode bayar netral HANYA untuk non-tunai (misal QRIS) -->
                                         @if(!$isCashOrder)
-                                            <span class="px-1.5 py-0.2 rounded bg-canvas border border-line text-[10px] font-bold text-ink-soft uppercase tracking-wider shrink-0">
+                                            <span class="px-1.5 py-0.2 rounded bg-canvas border border-line text-2xs font-bold text-ink-soft uppercase tracking-wider shrink-0">
                                                 {{ $methodLabel }}
                                             </span>
                                         @endif
@@ -250,13 +246,13 @@
                                  class="border-t border-dashed border-line p-3.5 sm:p-4 bg-surface space-y-3 text-xs">
                                 
                                 <!-- Meta Info Nota: ID Order & Lama Pengantaran (Tanggal/Jam Dihapus Sesuai Instruksi) -->
-                                <div class="flex items-center justify-between text-ink-soft text-[11px] pb-0.5">
+                                <div class="flex items-center justify-between text-ink-soft text-2xs pb-0.5">
                                     <div>
                                         <span class="text-ink-faint">ID: </span>
                                         <span class="font-mono text-ink font-semibold">#{{ $order->order_code }}</span>
                                     </div>
                                     @if($deliveryDuration)
-                                        <div class="text-ink-soft font-medium text-[11px] tabular-nums">
+                                        <div class="text-ink-soft font-medium text-2xs tabular-nums">
                                             {{ $deliveryDuration }}
                                         </div>
                                     @endif
@@ -270,7 +266,7 @@
                                                 <span class="font-semibold tabular-nums text-ink">{{ $item->quantity }}x</span>
                                                 <span class="ml-1 text-ink">{{ $item->item_name }}</span>
                                                 @if($item->notes)
-                                                    <p class="text-[11px] text-ink-faint italic pl-5 mt-0.5">{{ $item->notes }}</p>
+                                                    <p class="text-2xs text-ink-faint italic pl-5 mt-0.5">{{ $item->notes }}</p>
                                                 @endif
                                             </div>
                                             <x-price :amount="$item->subtotal" class="font-medium text-ink-soft tabular-nums shrink-0" />
@@ -285,7 +281,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
                                         </svg>
                                         <div class="min-w-0 flex-1">
-                                            <span class="font-medium text-ink-soft text-[11px] block">Catatan:</span>
+                                            <span class="font-medium text-ink-soft text-2xs block">Catatan:</span>
                                             <span class="text-ink leading-relaxed">{{ $order->notes }}</span>
                                         </div>
                                     </div>
@@ -294,7 +290,7 @@
                                 <!-- Garis Putus-Putus & Total Bersama Metode -->
                                 <div class="border-t border-dashed border-line pt-2.5 flex items-center justify-between text-xs">
                                     <!-- Nama Petugas: HANYA Ditampilkan Bila Berbeda dari Petugas yang Login -->
-                                    <div class="text-[11px] text-ink-soft">
+                                    <div class="text-2xs text-ink-soft">
                                         @if($order->processed_by && $order->processor && $order->processed_by !== Auth::id())
                                             <span>Petugas: <strong class="text-ink">{{ $order->processor->name }}</strong></span>
                                         @endif

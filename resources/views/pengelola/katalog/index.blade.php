@@ -54,30 +54,30 @@
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <a href="{{ route('pengelola.katalog.index') }}" 
            class="p-4 rounded-2xl border transition-all {{ !$category || $category === 'semua' ? 'bg-surface border-brand shadow-xs' : 'bg-surface border-line hover:border-brand/40' }}">
-            <p class="text-[11px] font-semibold text-ink-soft uppercase tracking-wider">Total Menu</p>
+            <p class="text-2xs font-semibold text-ink-soft uppercase tracking-wider">Total Menu</p>
             <div class="mt-1 text-2xl font-extrabold text-ink tabular-nums">{{ $stats['total'] }}</div>
         </a>
 
         <a href="{{ route('pengelola.katalog.index', ['category' => 'galon']) }}" 
            class="p-4 rounded-2xl border transition-all {{ $category === 'galon' ? 'bg-brand-wash border-brand shadow-xs' : 'bg-surface border-line hover:border-brand/40' }}">
-            <p class="text-[11px] font-semibold text-brand uppercase tracking-wider">Galon</p>
+            <p class="text-2xs font-semibold text-brand uppercase tracking-wider">Galon</p>
             <div class="mt-1 text-2xl font-extrabold text-ink tabular-nums">{{ $stats['galon'] }}</div>
         </a>
 
         <a href="{{ route('pengelola.katalog.index', ['category' => 'makanan']) }}" 
            class="p-4 rounded-2xl border transition-all {{ $category === 'makanan' ? 'bg-ochre-wash border-ochre shadow-xs' : 'bg-surface border-line hover:border-brand/40' }}">
-            <p class="text-[11px] font-semibold text-ochre uppercase tracking-wider">Makanan</p>
+            <p class="text-2xs font-semibold text-ochre-ink uppercase tracking-wider">Makanan</p>
             <div class="mt-1 text-2xl font-extrabold text-ink tabular-nums">{{ $stats['makanan'] }}</div>
         </a>
 
         <a href="{{ route('pengelola.katalog.index', ['category' => 'minuman']) }}" 
            class="p-4 rounded-2xl border transition-all {{ $category === 'minuman' ? 'bg-brand-wash border-brand shadow-xs' : 'bg-surface border-line hover:border-brand/40' }}">
-            <p class="text-[11px] font-semibold text-brand uppercase tracking-wider">Minuman</p>
+            <p class="text-2xs font-semibold text-brand uppercase tracking-wider">Minuman</p>
             <div class="mt-1 text-2xl font-extrabold text-ink tabular-nums">{{ $stats['minuman'] }}</div>
         </a>
 
         <div class="p-4 rounded-2xl border bg-surface border-line">
-            <p class="text-[11px] font-semibold text-alert uppercase tracking-wider">Stok Menipis</p>
+            <p class="text-2xs font-semibold text-alert uppercase tracking-wider">Stok Menipis</p>
             <div class="mt-1 text-2xl font-extrabold text-alert tabular-nums">{{ $stats['menipis'] }}</div>
         </div>
     </div>
@@ -157,7 +157,7 @@
                             </div>
                             <div>
                                 <h3 class="font-bold text-sm text-ink leading-tight">{{ $item->name }}</h3>
-                                <span class="text-[10px] font-semibold text-ink-soft uppercase tracking-wider block mt-0.5">
+                                <span class="text-2xs font-semibold text-ink-soft uppercase tracking-wider block mt-0.5">
                                     {{ ucfirst($item->category) }}
                                 </span>
                             </div>
@@ -186,13 +186,13 @@
                                 {{ $item->stock }} {{ $item->unit }}
                             </span>
                         </div>
-                        <div class="text-[11px] text-ink-faint">
+                        <div class="text-2xs text-ink-faint">
                             Min: {{ $item->minimum_stock }} {{ $item->unit }}
                         </div>
                     </div>
 
                     @if($isLow)
-                        <div class="mt-2 p-2 rounded-lg bg-alert-wash border border-alert/20 text-[11px] font-semibold text-alert flex items-center space-x-1.5">
+                        <div class="mt-2 p-2 rounded-lg bg-alert-wash border border-alert/20 text-2xs font-semibold text-alert flex items-center space-x-1.5">
                             <svg class="w-3.5 h-3.5 text-wait flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                             </svg>
@@ -247,8 +247,12 @@
                     </button>
                 </div>
 
-                <form :action="formUrl" method="POST" class="mt-4 space-y-4">
+                <form :action="formUrl" method="POST" class="mt-4 space-y-4" data-restore="katalog" data-open-var="modalOpen" data-url-var="formUrl" data-edit-var="isEdit">
                     @csrf
+                    <input type="hidden" name="_restore" value="katalog">
+                    <input type="hidden" name="_action" :value="formUrl">
+                    <input type="hidden" name="_edit" :value="isEdit ? 1 : 0">
+                    <x-form-errors form="katalog" />
                     <template x-if="isEdit">
                         <input type="hidden" name="_method" value="PUT">
                     </template>
@@ -257,6 +261,7 @@
                         <label class="block text-xs font-semibold text-ink mb-1">Nama Menu / Produk <span class="text-alert">*</span></label>
                         <input type="text" name="name" x-model="itemForm.name" required placeholder="Contoh: Kopi Susu Aren" 
                                class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="name" />
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
@@ -268,11 +273,13 @@
                                 <option value="minuman">Minuman</option>
                                 <option value="galon">Galon</option>
                             </select>
+                        <x-field-error name="category" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink mb-1">Satuan (Unit) <span class="text-alert">*</span></label>
                             <input type="text" name="unit" x-model="itemForm.unit" required placeholder="porsi / gelas / galon" 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="unit" />
                         </div>
                     </div>
 
@@ -281,11 +288,13 @@
                             <label class="block text-xs font-semibold text-ink mb-1">Harga Satuan (Rp) <span class="text-alert">*</span></label>
                             <input type="number" name="price" x-model="itemForm.price" required min="500" step="500" 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5 tabular-nums">
+                        <x-field-error name="price" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink mb-1">Batas Minimum Stok <span class="text-alert">*</span></label>
                             <input type="number" name="minimum_stock" x-model="itemForm.minimum_stock" required min="1" 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5 tabular-nums">
+                        <x-field-error name="minimum_stock" />
                         </div>
                     </div>
 
@@ -294,7 +303,8 @@
                             <label class="block text-xs font-semibold text-ink mb-1">Stok Awal Masuk <span class="text-alert">*</span></label>
                             <input type="number" name="stock" x-model="itemForm.stock" required min="0" 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5 tabular-nums">
-                            <p class="text-[11px] text-ink-faint mt-1">Stok awal akan dicatat ke dalam audit log.</p>
+                        <x-field-error name="stock" />
+                            <p class="text-2xs text-ink-faint mt-1">Stok awal akan dicatat ke dalam audit log.</p>
                         </div>
                     </template>
 
@@ -302,6 +312,7 @@
                         <label class="block text-xs font-semibold text-ink mb-1">Keterangan / Komposisi</label>
                         <input type="text" name="description" x-model="itemForm.description" placeholder="Disajikan panas / dingin" 
                                class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="description" />
                     </div>
 
                     <div class="flex items-center space-x-2 pt-2">

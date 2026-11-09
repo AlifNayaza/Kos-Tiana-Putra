@@ -78,7 +78,15 @@
     $labelText = $label ?? $config['defaultLabel'];
 @endphp
 
-<span {{ $attributes->merge(['class' => "inline-flex items-center gap-1.5 text-xs font-medium {$config['container']} {$config['text']}"]) }}>
-    <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ $config['dot'] }}"></span>
+@php
+    // Lencana berisi (pil berwarna) agar status terbaca sekilas, bukan hanya titik kecil.
+    $wash = [
+        'text-done' => 'bg-done-wash', 'text-wait' => 'bg-wait-wash', 'text-alert' => 'bg-alert-wash',
+        'text-process' => 'bg-process-wash', 'text-brand' => 'bg-brand-wash', 'text-ink-soft' => 'bg-canvas',
+    ][$config['text']] ?? 'bg-canvas';
+@endphp
+
+<span {{ $attributes->merge(['class' => "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold {$wash} {$config['text']}"]) }}>
+    <span class="w-2 h-2 rounded-full shrink-0 {{ $config['dot'] }}" aria-hidden="true"></span>
     <span>{{ $labelText }}</span>
 </span>

@@ -5,7 +5,7 @@
 
 @section('content')
 <div class="space-y-6" x-data="{
-    isRunning: false,
+    isRunning: {{ $isCalculating ? 'true' : 'false' }},
     guideModalOpen: false,
     guideTab: 'owner',
     restockModalOpen: false,
@@ -48,7 +48,7 @@
 }">
 
     <!-- Hidden textarea for WhatsApp Text Copying -->
-    <textarea id="waShoppingText" class="sr-only" readonly>{{ $waShoppingText }}</textarea>
+    <textarea id="waShoppingText" aria-label="Teks daftar belanja untuk WhatsApp" class="sr-only" readonly>{{ $waShoppingText }}</textarea>
 
     <!-- ============================================================== -->
     <!-- 1. HEADER BAR & PENGATURAN KEBUTUHAN -->
@@ -56,10 +56,10 @@
     <div class="bg-surface p-5 sm:p-6 rounded-2xl border border-line shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <div class="flex flex-wrap items-center gap-2">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-brand-wash text-brand border border-brand/20">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-2xs font-bold bg-brand-wash text-brand border border-brand/20">
                     Analisis Otomatis 30 Hari Terakhir
                 </span>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-canvas text-ink-soft border border-line">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-2xs font-semibold bg-canvas text-ink-soft border border-line">
                     Kebutuhan 7 Hari ke Depan
                 </span>
             </div>
@@ -81,6 +81,11 @@
                     @endif
                 </span>
             </p>
+            @if($isCalculating)
+                <p class="text-xs text-brand font-semibold mt-1.5">Sedang dihitung di latar belakang... muat ulang halaman beberapa saat lagi.</p>
+            @elseif($lastError)
+                <p class="text-xs text-alert mt-1.5">Perhitungan terakhir gagal: {{ $lastError }}</p>
+            @endif
         </div>
 
         <div class="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
@@ -131,13 +136,13 @@
         <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex flex-col justify-between">
             <div>
                 <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-bold text-ink-soft uppercase tracking-wider">Perlu Belanja</span>
+                    <span class="text-2xs font-bold text-ink-soft uppercase tracking-wider">Perlu Belanja</span>
                     @if($stats['need_restock'] > 0)
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-alert-wash text-alert border border-alert/20">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold bg-alert-wash text-alert border border-alert/20">
                             Perlu Restock
                         </span>
                     @else
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-done-wash text-done border border-done/20">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold bg-done-wash text-done border border-done/20">
                             Stok Aman
                         </span>
                     @endif
@@ -160,7 +165,7 @@
             <div class="mt-4 pt-3 border-t border-line flex items-center justify-between">
                 <button type="button" 
                         @click="activeFilter = 'restock'"
-                        class="text-[11px] font-bold text-brand hover:text-brand-deep transition-colors flex items-center space-x-1">
+                        class="text-2xs font-bold text-brand hover:text-brand-deep transition-colors flex items-center space-x-1">
                     <span>Lihat {{ $stats['need_restock'] }} barang ini &rarr;</span>
                 </button>
             </div>
@@ -170,8 +175,8 @@
         <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex flex-col justify-between">
             <div>
                 <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-bold text-ink-soft uppercase tracking-wider">Estimasi Uang Belanja</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-wash text-brand border border-brand/20">
+                    <span class="text-2xs font-bold text-ink-soft uppercase tracking-wider">Estimasi Uang Belanja</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold bg-brand-wash text-brand border border-brand/20">
                         7 Hari
                     </span>
                 </div>
@@ -180,11 +185,11 @@
                     <span class="text-2xl sm:text-[26px] font-extrabold text-brand tabular-nums tracking-tight block">
                         Rp {{ number_format($stats['estimated_budget'], 0, ',', '.') }}
                     </span>
-                    <p class="text-[11px] text-ink-faint mt-1 font-medium">Perkiraan dana belanja untuk membeli seluruh saran restock</p>
+                    <p class="text-2xs text-ink-faint mt-1 font-medium">Perkiraan dana belanja untuk membeli seluruh saran restock</p>
                 </div>
             </div>
 
-            <div class="mt-4 pt-3 border-t border-line flex items-center justify-between text-[11px] text-ink-soft">
+            <div class="mt-4 pt-3 border-t border-line flex items-center justify-between text-2xs text-ink-soft">
                 <span>Rata-rata modal per barang:</span>
                 <span class="font-bold text-ink tabular-nums">
                     Rp {{ $stats['need_restock'] > 0 ? number_format($stats['estimated_budget'] / $stats['need_restock'], 0, ',', '.') : '0' }}
@@ -196,8 +201,8 @@
         <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex flex-col justify-between">
             <div>
                 <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-bold text-ink-soft uppercase tracking-wider">Kebutuhan Galon (7 Hari)</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand-wash text-brand border border-brand/20">
+                    <span class="text-2xs font-bold text-ink-soft uppercase tracking-wider">Kebutuhan Galon (7 Hari)</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold bg-brand-wash text-brand border border-brand/20">
                         Aqua &bull; Le Min &bull; RO
                     </span>
                 </div>
@@ -209,7 +214,7 @@
                     <span class="text-xs text-ink-soft font-medium">Galon Air</span>
                 </div>
 
-                <p class="text-[11px] text-ink-soft mt-1">
+                <p class="text-2xs text-ink-soft mt-1">
                     Sisa di kos: <strong class="text-ink tabular-nums">{{ $stats['galon_stock'] }}</strong> &bull; 
                     Saran pesan: <strong class="text-alert tabular-nums">+{{ $stats['galon_restock'] }} galon</strong>
                 </p>
@@ -218,7 +223,7 @@
             <div class="mt-4 pt-3 border-t border-line flex items-center justify-between">
                 <button type="button" 
                         @click="activeFilter = 'galon'"
-                        class="text-[11px] font-bold text-brand hover:text-brand-deep transition-colors">
+                        class="text-2xs font-bold text-brand hover:text-brand-deep transition-colors">
                     Lihat khusus galon &rarr;
                 </button>
             </div>
@@ -228,8 +233,8 @@
         <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex flex-col justify-between">
             <div>
                 <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-bold text-ink-soft uppercase tracking-wider">Persediaan Masih Cukup</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-done-wash text-done border border-done/20">
+                    <span class="text-2xs font-bold text-ink-soft uppercase tracking-wider">Persediaan Masih Cukup</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold bg-done-wash text-done border border-done/20">
                         Aman
                     </span>
                 </div>
@@ -241,12 +246,12 @@
                     <span class="text-xs text-ink-soft font-medium">dari {{ $stats['total'] }} Barang</span>
                 </div>
 
-                <p class="text-[11px] text-ink-faint mt-1">
+                <p class="text-2xs text-ink-faint mt-1">
                     Stok mencukupi untuk 1&ndash;2 minggu ke depan
                 </p>
             </div>
 
-            <div class="mt-4 pt-3 border-t border-line flex items-center justify-between text-[11px]">
+            <div class="mt-4 pt-3 border-t border-line flex items-center justify-between text-2xs">
                 <span class="text-ink-soft">Kesiapan persediaan:</span>
                 <span class="font-extrabold text-done tabular-nums">
                     {{ round(($stats['aman'] / max(1, $stats['total'])) * 100) }}% Cukup
@@ -294,7 +299,7 @@
 
             <!-- Canvas Chart.js -->
             <div class="relative h-96 w-full pt-2">
-                <canvas id="stockComparisonChart"></canvas>
+                <canvas id="stockComparisonChart" role="img" aria-label="Grafik batang membandingkan stok di kos dengan kebutuhan tujuh hari untuk setiap barang"></canvas>
             </div>
         </div>
 
@@ -329,23 +334,23 @@
                         <div class="space-y-1 min-w-0 flex-1">
                             <div class="flex items-center space-x-1.5 flex-wrap">
                                 @if($item->status === 'kritis')
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-alert-wash text-alert border border-alert/20">
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-alert-wash text-alert border border-alert/20">
                                         Mendesak
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-wait-wash text-wait border border-wait/20">
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-wait-wash text-wait border border-wait/20">
                                         Perlu Ditambah
                                     </span>
                                 @endif
                                 <span class="font-bold text-ink truncate">{{ $catItem?->name }}</span>
                             </div>
 
-                            <p class="text-[11px] text-ink-soft">
+                            <p class="text-2xs text-ink-soft">
                                 Sisa di kos: <strong class="text-ink tabular-nums">{{ $item->current_stock }} {{ $catItem?->unit }}</strong> 
                                 <span class="text-ink-faint">({{ $daysSupply <= 2.5 ? 'habis dlm ~' . $daysSupply . ' hari' : 'cukup ~' . $daysSupply . ' hari' }})</span>
                             </p>
 
-                            <p class="text-[11px] font-semibold text-brand tabular-nums">
+                            <p class="text-2xs font-semibold text-brand tabular-nums">
                                 Estimasi biaya: {{ $item->formatted_estimated_cost }}
                             </p>
                         </div>
@@ -365,7 +370,7 @@
                                         restock_qty: {{ $item->recommended_restock_qty }},
                                         price: {{ $catItem?->price ?? 0 }}
                                     })"
-                                    class="px-2.5 py-1 rounded-lg bg-brand hover:bg-brand-deep text-surface font-bold text-[11px] transition-colors shadow-2xs flex items-center space-x-1">
+                                    class="px-2.5 py-1 rounded-lg bg-brand hover:bg-brand-deep text-surface font-bold text-2xs transition-colors shadow-2xs flex items-center space-x-1">
                                 <span>+ Catat Dibeli</span>
                             </button>
                         </div>
@@ -373,7 +378,7 @@
                 @empty
                     <div class="p-8 text-center text-ink-faint space-y-2">
                         <p class="font-bold text-done text-xs">Persediaan Kos Masih Aman!</p>
-                        <p class="text-[11px] text-ink-soft">Tidak ada barang yang perlu dibeli untuk 7 hari ke depan.</p>
+                        <p class="text-2xs text-ink-soft">Tidak ada barang yang perlu dibeli untuk 7 hari ke depan.</p>
                     </div>
                 @endforelse
             </div>
@@ -420,7 +425,7 @@
                     :class="activeFilter === 'semua' ? 'bg-brand text-surface font-bold shadow-2xs' : 'bg-canvas text-ink-soft hover:bg-line font-medium'"
                     class="px-3 py-1.5 rounded-full transition-all flex items-center space-x-1.5 whitespace-nowrap">
                 <span>Semua Barang</span>
-                <span class="text-[10px] px-1.5 py-0.2 rounded-full"
+                <span class="text-2xs px-1.5 py-0.2 rounded-full"
                       :class="activeFilter === 'semua' ? 'bg-brand-deep text-surface' : 'bg-line text-ink-soft'">
                     {{ $stats['total'] }}
                 </span>
@@ -431,7 +436,7 @@
                     :class="activeFilter === 'restock' ? 'bg-brand text-surface font-bold shadow-2xs' : 'bg-canvas text-ink-soft hover:bg-line font-medium'"
                     class="px-3 py-1.5 rounded-full transition-all flex items-center space-x-1.5 whitespace-nowrap">
                 <span>Perlu Belanja Saja</span>
-                <span class="text-[10px] px-1.5 py-0.2 rounded-full"
+                <span class="text-2xs px-1.5 py-0.2 rounded-full"
                       :class="activeFilter === 'restock' ? 'bg-brand-deep text-surface' : 'bg-line text-ink-soft'">
                     {{ $stats['need_restock'] }}
                 </span>
@@ -442,7 +447,7 @@
                     :class="activeFilter === 'kritis' ? 'bg-alert text-surface font-bold shadow-2xs' : 'bg-canvas text-ink-soft hover:bg-line font-medium'"
                     class="px-3 py-1.5 rounded-full transition-all flex items-center space-x-1.5 whitespace-nowrap">
                 <span>Mendesak</span>
-                <span class="text-[10px] px-1.5 py-0.2 rounded-full"
+                <span class="text-2xs px-1.5 py-0.2 rounded-full"
                       :class="activeFilter === 'kritis' ? 'bg-alert text-surface' : 'bg-line text-ink-soft'">
                     {{ $stats['kritis'] }}
                 </span>
@@ -453,7 +458,7 @@
                     :class="activeFilter === 'galon' ? 'bg-brand text-surface font-bold shadow-2xs' : 'bg-canvas text-ink-soft hover:bg-line font-medium'"
                     class="px-3 py-1.5 rounded-full transition-all flex items-center space-x-1.5 whitespace-nowrap">
                 <span>Khusus Galon</span>
-                <span class="text-[10px] px-1.5 py-0.2 rounded-full"
+                <span class="text-2xs px-1.5 py-0.2 rounded-full"
                       :class="activeFilter === 'galon' ? 'bg-brand-deep text-surface' : 'bg-line text-ink-soft'">
                     {{ $predictions->where('catalogItem.category', 'galon')->count() }}
                 </span>
@@ -464,7 +469,7 @@
                     :class="activeFilter === 'makanan' ? 'bg-brand text-surface font-bold shadow-2xs' : 'bg-canvas text-ink-soft hover:bg-line font-medium'"
                     class="px-3 py-1.5 rounded-full transition-all flex items-center space-x-1.5 whitespace-nowrap">
                 <span>Makanan</span>
-                <span class="text-[10px] px-1.5 py-0.2 rounded-full"
+                <span class="text-2xs px-1.5 py-0.2 rounded-full"
                       :class="activeFilter === 'makanan' ? 'bg-brand-deep text-surface' : 'bg-line text-ink-soft'">
                     {{ $predictions->where('catalogItem.category', 'makanan')->count() }}
                 </span>
@@ -475,7 +480,7 @@
                     :class="activeFilter === 'minuman' ? 'bg-brand text-surface font-bold shadow-2xs' : 'bg-canvas text-ink-soft hover:bg-line font-medium'"
                     class="px-3 py-1.5 rounded-full transition-all flex items-center space-x-1.5 whitespace-nowrap">
                 <span>Minuman</span>
-                <span class="text-[10px] px-1.5 py-0.2 rounded-full"
+                <span class="text-2xs px-1.5 py-0.2 rounded-full"
                       :class="activeFilter === 'minuman' ? 'bg-brand-deep text-surface' : 'bg-line text-ink-soft'">
                     {{ $predictions->where('catalogItem.category', 'minuman')->count() }}
                 </span>
@@ -484,7 +489,7 @@
 
         <!-- Tabel Render -->
         <div class="overflow-x-auto -mx-5 sm:-mx-6">
-            <table class="w-full text-left text-xs">
+            <table class="w-full text-left text-xs table-stack">
                 <thead>
                     <tr class="bg-canvas border-y border-line text-ink-soft uppercase tracking-wider font-semibold">
                         <th class="py-3.5 px-5 sm:px-6">Nama Barang</th>
@@ -513,7 +518,7 @@
                             class="hover:bg-canvas/60 transition-colors">
                             
                             <!-- 1. Nama Barang & Kategori -->
-                            <td class="py-4 px-5 sm:px-6">
+                            <td class="py-4 px-5 sm:px-6" data-primary>
                                 <div class="flex items-center space-x-3">
                                     <div class="w-9 h-9 rounded-xl bg-canvas border border-line flex items-center justify-center text-base flex-shrink-0">
                                         @if($item?->category === 'galon')
@@ -528,7 +533,7 @@
                                         <p class="font-bold text-ink leading-tight text-xs sm:text-sm">
                                             {{ $item?->name ?? 'Produk' }}
                                         </p>
-                                        <div class="flex items-center space-x-2 text-[10px] text-ink-soft uppercase font-medium mt-0.5">
+                                        <div class="flex items-center space-x-2 text-2xs text-ink-soft uppercase font-medium mt-0.5">
                                             <span>{{ $item?->category }}</span>
                                             <span>&bull;</span>
                                             <span class="text-ink-soft">Cadangan Minimal: <strong class="text-ink tabular-nums">{{ $formula['safety'] }} {{ $item?->unit }}</strong></span>
@@ -538,36 +543,36 @@
                             </td>
 
                             <!-- 2. Konsumsi Penghuni (Rata-rata & Tren) -->
-                            <td class="py-4 px-4 whitespace-nowrap">
+                            <td class="py-4 px-4 whitespace-nowrap" data-label="Konsumsi"><div class="cell-value">
                                 <div class="space-y-1">
                                     <div class="font-bold text-ink tabular-nums text-xs sm:text-sm">
                                         {{ number_format($pred->daily_avg_sales, 1) }}
                                         <span class="text-xs font-normal text-ink-soft">{{ $item?->unit }}/hari</span>
                                     </div>
                                     @if($pred->sales_trend === 'naik')
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-done-wash text-done border border-done/20">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-done-wash text-done border border-done/20">
                                             ↗ Makin Ramai
                                         </span>
                                     @elseif($pred->sales_trend === 'turun')
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-canvas text-ink-soft border border-line">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-canvas text-ink-soft border border-line">
                                             ↘ Menurun
                                         </span>
                                     @else
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-canvas text-ink-soft border border-line">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-canvas text-ink-soft border border-line">
                                             → Normal
                                         </span>
                                     @endif
                                 </div>
-                            </td>
+                            </div></td>
 
                             <!-- 3. Stok di Kos & Ketahanan Waktu -->
-                            <td class="py-4 px-4 whitespace-nowrap min-w-[170px]">
+                            <td class="py-4 px-4 whitespace-nowrap min-w-[170px]" data-label="Stok di kos"><div class="cell-value">
                                 <div class="space-y-1.5">
                                     <div class="flex items-baseline justify-between text-xs tabular-nums">
                                         <span class="font-bold text-ink">
                                             Sisa: <span class="{{ $pred->current_stock <= $formula['safety'] ? 'text-alert font-extrabold' : 'text-ink' }}">{{ $pred->current_stock }} {{ $item?->unit }}</span>
                                         </span>
-                                        <span class="text-[10px] font-semibold {{ $daysSupply <= 2.5 ? 'text-alert font-bold' : ($daysSupply <= 5 ? 'text-wait' : 'text-done') }}">
+                                        <span class="text-2xs font-semibold {{ $daysSupply <= 2.5 ? 'text-alert font-bold' : ($daysSupply <= 5 ? 'text-wait' : 'text-done') }}">
                                             {{ $daysSupply <= 2.5 ? 'Habis ~' . $daysSupply . ' hari' : 'Cukup ~' . $daysSupply . ' hari' }}
                                         </span>
                                     </div>
@@ -578,28 +583,28 @@
                                              style="width: {{ $pctStock }}%"></div>
                                     </div>
                                 </div>
-                            </td>
+                            </div></td>
 
                             <!-- 4. Kebutuhan 7 Hari -->
-                            <td class="py-4 px-4 whitespace-nowrap">
+                            <td class="py-4 px-4 whitespace-nowrap" data-label="Kebutuhan 7 hari"><div class="cell-value">
                                 <div class="space-y-0.5 tabular-nums">
                                     <span class="font-bold text-ink text-xs">
                                         {{ $pred->predicted_demand_qty }} {{ $item?->unit }}
                                     </span>
-                                    <span class="text-[10px] text-ink-faint block">
+                                    <span class="text-2xs text-ink-faint block">
                                         Target total: {{ $pred->target_stock }}
                                     </span>
                                 </div>
-                            </td>
+                            </div></td>
 
                             <!-- 5. Saran Belanja -->
-                            <td class="py-4 px-4 whitespace-nowrap">
+                            <td class="py-4 px-4 whitespace-nowrap" data-label="Saran belanja"><div class="cell-value">
                                 @if($pred->recommended_restock_qty > 0)
                                     <div class="space-y-0.5">
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-extrabold tabular-nums {{ $pred->status === 'kritis' ? 'bg-alert-wash text-alert border border-alert/20' : 'bg-wait-wash text-wait border border-wait/20' }}">
                                             + {{ $pred->recommended_restock_qty }} {{ $item?->unit }}
                                         </span>
-                                        <p class="text-[10px] font-semibold text-brand tabular-nums">
+                                        <p class="text-2xs font-semibold text-brand tabular-nums">
                                             Est. {{ $pred->formatted_estimated_cost }}
                                         </p>
                                     </div>
@@ -608,30 +613,30 @@
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-done-wash text-done border border-done/20">
                                             ✓ Cukup
                                         </span>
-                                        <span class="text-[10px] text-ink-faint block">Tidak perlu belanja</span>
+                                        <span class="text-2xs text-ink-faint block">Tidak perlu belanja</span>
                                     </div>
                                 @endif
-                            </td>
+                            </div></td>
 
                             <!-- 6. Kondisi -->
-                            <td class="py-4 px-4 whitespace-nowrap">
+                            <td class="py-4 px-4 whitespace-nowrap" data-label="Kondisi"><div class="cell-value">
                                 @if($pred->status === 'kritis')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-alert-wash text-alert border border-alert/20">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-2xs font-bold bg-alert-wash text-alert border border-alert/20">
                                         Mendesak
                                     </span>
                                 @elseif($pred->status === 'waspada')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-wait-wash text-wait border border-wait/20">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-2xs font-bold bg-wait-wash text-wait border border-wait/20">
                                         Perlu Ditambah
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-done-wash text-done border border-done/20">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-2xs font-bold bg-done-wash text-done border border-done/20">
                                         Aman
                                     </span>
                                 @endif
-                            </td>
+                            </div></td>
 
                             <!-- 7. Aksi Cepat (1-Klik Restock) -->
-                            <td class="py-4 px-5 sm:px-6 text-right whitespace-nowrap">
+                            <td class="py-4 px-5 sm:px-6 text-right whitespace-nowrap" data-actions>
                                 <button type="button" 
                                         @click="openRestock({
                                             prediction_id: {{ $pred->id }},
@@ -779,7 +784,7 @@
                             </div>
                             <div class="p-3 bg-canvas rounded-xl border border-line">
                                 <span class="font-bold text-brand block mb-1">2. Artisan CLI</span>
-                                Command <code class="font-mono text-[10px] bg-line px-1 rounded">stok:prediksi</code> dijalankan terjadwal / on-demand.
+                                Command <code class="font-mono text-2xs bg-line px-1 rounded">stok:prediksi</code> dijalankan terjadwal / on-demand.
                             </div>
                             <div class="p-3 bg-canvas rounded-xl border border-line">
                                 <span class="font-bold text-brand block mb-1">3. Python Regression</span>
@@ -790,7 +795,7 @@
 
                     <div class="space-y-1.5">
                         <h4 class="text-xs font-bold text-ink uppercase tracking-wider">Rumus Matematika Proyeksi</h4>
-                        <div class="bg-ink text-brand-wash p-3.5 rounded-xl space-y-1 font-mono text-[11px]">
+                        <div class="bg-ink text-brand-wash p-3.5 rounded-xl space-y-1 font-mono text-2xs">
                             <p class="text-white font-bold">1. Garis Regresi Linier:</p>
                             <p class="pl-2 text-ink-faint">y = (m &times; Hari) + c  (m = Slope koefisien tren, c = Intersep)</p>
                             <p class="pl-2 text-brand-wash">Prediksi_7H = (0.5 &times; Regresi_7H) + (0.5 &times; Moving_Avg_7H)</p>
@@ -891,7 +896,7 @@
                                    max="1000" 
                                    required 
                                    class="w-full text-sm font-extrabold px-3.5 py-2.5 border border-line rounded-xl text-ink focus:outline-none focus:ring-2 focus:ring-brand-wash focus:border-brand bg-surface tabular-nums">
-                            <span class="text-[11px] text-ink-faint mt-1 block">
+                            <span class="text-2xs text-ink-faint mt-1 block">
                                 Stok setelah restock menjadi: <strong class="text-ink tabular-nums" x-text="(parseInt(selectedItem.current_stock) + parseInt(restockQty || 0)) + ' ' + selectedItem.unit"></strong>
                             </span>
                         </div>
@@ -925,6 +930,7 @@
 @endsection
 
 @push('scripts')
+@include('layouts.partials.charts-script')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -1003,17 +1009,23 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             scales: {
                 x: {
-                    grid: { color: '#dbe1dc' },
+                    grid: { color: '#dedbd0' },
                     ticks: {
-                        font: { family: "'Plus Jakarta Sans', sans-serif", size: 10 },
-                        color: '#55645f'
+                        font: { family: "'Plus Jakarta Sans', sans-serif", size: 12 },
+                        color: '#46544f',
+                        maxTicksLimit: 6
                     }
                 },
                 y: {
                     grid: { display: false },
                     ticks: {
-                        font: { family: "'Plus Jakarta Sans', sans-serif", size: 11, weight: '600' },
-                        color: '#16201e'
+                        font: { family: "'Plus Jakarta Sans', sans-serif", size: 12, weight: '600' },
+                        color: '#17211f',
+                        callback: function (value) {
+                            const label = String(this.getLabelForValue(value));
+                            const max = window.innerWidth < 640 ? 14 : 28;
+                            return label.length > max ? label.slice(0, max - 1) + '…' : label;
+                        }
                     }
                 }
             }

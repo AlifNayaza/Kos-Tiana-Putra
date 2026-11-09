@@ -4,20 +4,21 @@
     add(message, type = 'success') {
         const id = Date.now();
         this.notifications.push({ id, message, type });
-        setTimeout(() => this.remove(id), 5000);
+        setTimeout(() => this.remove(id), type === 'error' ? 9000 : 5000);
     },
     remove(id) {
         this.notifications = this.notifications.filter(n => n.id !== id);
     }
 }" 
+@kos-toast.window="add($event.detail.message, $event.detail.type)"
 x-init="
-    @if(session('success')) add('{{ addslashes(session('success')) }}', 'success'); @endif
-    @if(session('error')) add('{{ addslashes(session('error')) }}', 'error'); @endif
-    @if(session('warning')) add('{{ addslashes(session('warning')) }}', 'warning'); @endif
-    @if(session('info')) add('{{ addslashes(session('info')) }}', 'info'); @endif
-    @if(isset($errors) && $errors->any()) add('{{ addslashes($errors->first()) }}', 'error'); @endif
+    @if(session('success')) add(@js(session('success')), 'success'); @endif
+    @if(session('error')) add(@js(session('error')), 'error'); @endif
+    @if(session('warning')) add(@js(session('warning')), 'warning'); @endif
+    @if(session('info')) add(@js(session('info')), 'info'); @endif
+    @if(isset($errors) && $errors->any()) add(@js($errors->first()), 'error'); @endif
 "
-class="fixed top-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none max-w-sm w-full px-4 sm:px-0">
+role="status" aria-live="polite" class="fixed top-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none max-w-sm w-full px-4 sm:px-0">
     <template x-for="item in notifications" :key="item.id">
         <div x-show="true" 
              x-transition:enter="transform ease-out duration-300 transition"

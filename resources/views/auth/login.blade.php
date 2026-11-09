@@ -6,53 +6,16 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Masuk — Kos Tiana Putra 1</title>
 
-    <!-- Google Fonts: Instrument Sans & Plus Jakarta Sans Fallback -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     @if(file_exists(public_path('build/manifest.json')))
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @fonts
     @else
-        <script src="https://cdn.tailwindcss.com"></script>
-        <script>
-            tailwind.config = {
-                theme: {
-                    extend: {
-                        fontFamily: {
-                            sans: ['"Instrument Sans"', '"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-                        },
-                        colors: {
-                            canvas: '#f2f4f1',
-                            surface: '#fafbf9',
-                            line: '#dbe1dc',
-                            ink: '#16201e',
-                            'ink-soft': '#55645f',
-                            'ink-faint': '#8a9892',
-                            brand: '#006059',
-                            'brand-deep': '#004540',
-                            'brand-wash': '#e1eeeb',
-                            ochre: '#c98a2b',
-                            'ochre-wash': '#f6ead4',
-                            wait: '#a86a0c',
-                            'wait-wash': '#f8f1e5',
-                            process: '#3b5a8c',
-                            'process-wash': '#edf2f8',
-                            done: '#4b7d57',
-                            'done-wash': '#edf5f0',
-                            alert: '#b03a22',
-                            'alert-wash': '#faece9',
-                        }
-                    }
-                }
-            }
-        </script>
-        <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+        @include('layouts.partials.tailwind-fallback', ['chart' => false])
     @endif
 
     <style>
         [x-cloak] { display: none !important; }
-        body { font-family: 'Instrument Sans', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif; }
     </style>
 </head>
 <body class="min-h-full bg-canvas text-ink antialiased selection:bg-brand-wash selection:text-brand-deep">
@@ -77,9 +40,9 @@
             <div class="relative z-10 flex items-center justify-between">
                 <div class="flex items-center gap-2">
                     <span class="text-base font-bold tracking-tight text-white">Kos Tiana Putra</span>
-                    <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-surface/15 text-white text-[11px] font-mono font-bold border border-surface/25 shadow-xs">1</span>
+                    <span class="inline-flex items-center justify-center w-5 h-5 rounded-md bg-surface/15 text-white text-2xs font-mono font-bold border border-surface/25 shadow-xs">1</span>
                 </div>
-                <div class="flex items-center gap-1.5 text-[11px] text-white/80">
+                <div class="flex items-center gap-1.5 text-2xs text-white/80">
                     <span class="w-1.5 h-1.5 rounded-full bg-ochre"></span>
                     <span>Warkop buka s.d. 23.00</span>
                 </div>
@@ -104,7 +67,7 @@
             </div>
 
             <div class="px-12 py-4">
-                <h1 class="max-w-[15ch] text-balance text-[clamp(2.5rem,4.2vw,4rem)] font-semibold leading-[1.05] tracking-tight">
+                <h1 class="font-display max-w-[15ch] text-balance text-[clamp(2.5rem,4.2vw,4rem)] font-extrabold leading-[1.05] tracking-tight">
                     Kopi hangat dan galon sampai depan pintu.
                 </h1>
                 <p class="mt-5 flex items-center gap-3 text-[15px] text-white/80">
@@ -131,7 +94,7 @@
 
                 <!-- Header Form (Sapaan Akrab & Natural) -->
                 <div>
-                    <h1 class="text-xl sm:text-2xl font-bold text-ink tracking-tight">Masuk</h1>
+                    <h1 class="font-display text-3xl sm:text-4xl font-extrabold text-brand-deep tracking-tight">Masuk</h1>
                     <p class="text-xs sm:text-sm text-ink-soft mt-1 leading-relaxed">
                         Tagihan, pesanan, dan antrean menunggu di balik pintu ini.
                     </p>
@@ -268,7 +231,7 @@
                 <!-- 4. AKSES DEMO (Terkoneksi ke Titik Ilustrasi Lorong Kos)       -->
                 <!-- ============================================================== -->
                 @php
-                    $showDemo = config('app.demo', true);
+                    $showDemo = config('kos.demo_login');
                 @endphp
 
                 @if($showDemo)
@@ -301,7 +264,7 @@
                                     <div class="min-w-0 flex-1">
                                         <div class="flex items-center gap-1.5">
                                             <span class="text-sm font-semibold text-ink group-hover:text-brand transition-colors">Pengelola</span>
-                                            <span class="text-[11px] text-ink-faint">&bull; Pak H. Tiana</span>
+                                            <span class="text-2xs text-ink-faint">&bull; Pak H. Tiana</span>
                                         </div>
                                         <p class="text-[13px] text-ink-soft leading-tight truncate">
                                             Kelola kamar, tagihan sewa bulanan, dan laporan
@@ -335,7 +298,7 @@
                                     <div class="min-w-0 flex-1">
                                         <div class="flex items-center gap-1.5">
                                             <span class="text-sm font-semibold text-ink group-hover:text-brand transition-colors">Petugas</span>
-                                            <span class="text-[11px] text-ink-faint">&bull; Mas Joko</span>
+                                            <span class="text-2xs text-ink-faint">&bull; Mas Joko</span>
                                         </div>
                                         <p class="text-[13px] text-ink-soft leading-tight truncate">
                                             Antrean tugas, antar galon, dan periksa stok
@@ -369,7 +332,7 @@
                                     <div class="min-w-0 flex-1">
                                         <div class="flex items-center gap-1.5">
                                             <span class="text-sm font-semibold text-ink group-hover:text-brand transition-colors">Penghuni</span>
-                                            <span class="text-[11px] text-ink-faint">&bull; Dimas (A-04)</span>
+                                            <span class="text-2xs text-ink-faint">&bull; Dimas (A-04)</span>
                                         </div>
                                         <p class="text-[13px] text-ink-soft leading-tight truncate">
                                             Pesan menu & galon, cek tagihan sewa bulanan

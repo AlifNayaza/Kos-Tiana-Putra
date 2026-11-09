@@ -1,19 +1,28 @@
 @props(['order'])
 
 @php
-    $isCash = in_array(strtolower($order->payment_method ?? ''), ['tunai', 'cash']);
+    $isCash = \App\Models\Order::isCashMethod($order->payment_method);
     $isPaid = ($order->payment_status === 'lunas');
 @endphp
 
-<div class="bg-surface rounded-xl border border-line p-4 shadow-xs space-y-3 transition-colors hover:border-ink-faint">
+@php
+    $statusBorder = match ($order->status) {
+        'menunggu' => 'border-l-wait',
+        'diproses' => 'border-l-process',
+        'diantar' => 'border-l-brand',
+        'selesai' => 'border-l-done',
+        default => 'border-l-line',
+    };
+@endphp
+<div data-order-id="{{ $order->id }}" data-order-status="{{ $order->status }}" class="bg-surface rounded-2xl border border-line border-l-[6px] {{ $statusBorder }} p-4 shadow-sm space-y-3 transition-shadow hover:shadow-md">
     <!-- Baris 1: Nomor Kamar & Status Badge + Indikator Tertunda -->
-    <div class="flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2">
-            <span class="text-base sm:text-lg font-bold text-ink leading-tight tracking-tight">
+    <div class="flex items-start justify-between gap-2">
+        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
+            <span class="whitespace-nowrap text-lg sm:text-xl font-bold text-ink leading-tight tracking-tight">
                 {{ $order->room_number }}
             </span>
             @if($order->is_delayed)
-                <span class="text-[11px] font-semibold text-alert">
+                <span class="text-2xs font-semibold text-alert">
                     Tertunda ({{ $order->delayed_duration }})
                 </span>
             @endif
@@ -33,6 +42,24 @@
         <span>dibuat {{ $order->created_at ? $order->created_at->diffForHumans() : '-' }}</span>
     </div>
 
+    @php
+        $contactPhone = $order->user->phone ?? null;
+        $telUrl = \App\Support\Phone::telUrl($contactPhone);
+        $waUrl = \App\Support\Phone::whatsappUrl($contactPhone, "Halo {$order->user->name}, ini petugas " . config('kos.name') . ". Pesanan #{$order->order_code} ke {$order->room_number} sedang kami proses ya.");
+    @endphp
+    @if($telUrl)
+        <div class="flex gap-2">
+            <a href="{{ $telUrl }}" class="inline-flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-xl border border-line bg-surface text-xs font-semibold text-ink hover:bg-brand-wash transition-colors">
+                <svg class="w-4 h-4 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                Telepon<span class="sr-only"> {{ $order->user->name }}</span>
+            </a>
+            <a href="{{ $waUrl }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-xl border border-line bg-surface text-xs font-semibold text-ink hover:bg-brand-wash transition-colors">
+                <svg class="w-4 h-4 text-done" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h8M8 14h5m-9 6l1.6-4.2A8 8 0 1112 20a8 8 0 01-3.6-.9L4 20z"/></svg>
+                WhatsApp<span class="sr-only"> {{ $order->user->name }}</span>
+            </a>
+        </div>
+    @endif
+
     <!-- Daftar Item -->
     <div class="space-y-1.5 text-xs text-ink pt-1">
         @foreach($order->items as $item)
@@ -41,7 +68,7 @@
                     <span class="font-semibold tabular-nums text-ink">{{ $item->quantity }}x</span>
                     <span class="ml-1 text-ink">{{ $item->item_name }}</span>
                     @if($item->notes && trim($item->notes) !== trim($order->notes ?? ''))
-                        <p class="text-[11px] text-ink-faint italic pl-5 mt-0.5">{{ $item->notes }}</p>
+                        <p class="text-2xs text-ink-faint italic pl-5 mt-0.5">{{ $item->notes }}</p>
                     @endif
                 </div>
                 <x-price :amount="$item->subtotal" class="font-medium text-ink-soft text-right shrink-0" />
@@ -113,7 +140,7 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
                     </svg>
-                    <span>{{ ($isCash && !$isPaid) ? 'Selesai, uang diterima' : 'Selesai' }}</span>
+                    <span>{{ ($isCash && !$isPaid) ? 'Selesai, terima tunai Rp ' . number_format($order->total_amount, 0, ',', '.') : 'Selesai' }}</span>
                 </button>
             @endif
         </form>

@@ -1,6 +1,57 @@
 @extends('layouts.mobile')
 
 @section('content')
+@php
+    $hour = (int) now()->format('H');
+    $greeting = $hour < 11 ? 'pagi' : ($hour < 15 ? 'siang' : ($hour < 18 ? 'sore' : 'malam'));
+    $firstName = explode(' ', trim(Auth::user()->name))[0] ?? 'Penghuni';
+    $billStatus = $activeBill?->effective_status;
+    $billTile = match ($billStatus) {
+        'lunas' => ['Lunas', 'text-done'],
+        'menunggak' => ['Menunggak', 'text-alert'],
+        'menunggu_verifikasi' => ['Dicek pengelola', 'text-wait'],
+        'menunggu' => ['Belum dibayar', 'text-wait'],
+        default => ['Lihat riwayat', 'text-ink-soft'],
+    };
+@endphp
+
+<!-- Sapaan + aksi cepat: tiga hal yang paling sering dilakukan penghuni -->
+<section aria-labelledby="hero-title" class="mb-5 relative overflow-hidden rounded-3xl bg-gradient-to-br from-ochre-wash via-surface to-brand-wash text-ink p-5 shadow-sm border border-line">
+    <div class="absolute -right-8 -top-10 w-44 h-44 rounded-full bg-ochre/25 blur-2xl" aria-hidden="true"></div>
+    <div class="relative">
+        <p class="text-sm font-semibold text-ochre-ink">{{ now()->translatedFormat('l, d F') }}</p>
+        <h1 id="hero-title" class="mt-0.5 text-3xl text-brand-deep">Halo, {{ $firstName }}</h1>
+        <p class="mt-1 text-sm text-ink-soft">
+            {{ $room ? $room->room_number : 'Penghuni' }} &middot; Selamat {{ $greeting }}, mau pesan apa hari ini?
+        </p>
+
+        <div class="mt-4 grid grid-cols-3 gap-2.5">
+            <a href="{{ route('penghuni.katalog', ['category' => 'galon']) }}" class="action-tile text-ink">
+                <span class="w-10 h-10 rounded-xl bg-process-wash text-process flex items-center justify-center" aria-hidden="true">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3.5c-3 4-5 6.5-5 9a5 5 0 0010 0c0-2.5-2-5-5-9z"/></svg>
+                </span>
+                <span class="text-sm font-bold leading-tight">Pesan galon</span>
+            </a>
+            <a href="{{ route('penghuni.katalog') }}" class="action-tile text-ink">
+                <span class="w-10 h-10 rounded-xl bg-ochre-wash text-ochre-ink flex items-center justify-center" aria-hidden="true">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                </span>
+                <span class="text-sm font-bold leading-tight">Pesan menu</span>
+            </a>
+            <a href="{{ route('penghuni.tagihan') }}" class="action-tile text-ink">
+                <span class="w-10 h-10 rounded-xl bg-brand-wash text-brand flex items-center justify-center" aria-hidden="true">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </span>
+                <span class="leading-tight">
+                    <span class="block text-sm font-bold">Tagihan</span>
+                    <span class="block text-2xs font-semibold {{ $billTile[1] }}">{{ $billTile[0] }}</span>
+                </span>
+            </a>
+        </div>
+    </div>
+</section>
+
+
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start" x-data="{
     changeGalonSheet: false,
     selectedGalonId: {{ $lastGalonItem->id ?? 0 }},
@@ -147,7 +198,7 @@
         @if($activeOrders->isNotEmpty())
             <div class="space-y-3">
                 <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-bold text-ink-faint uppercase tracking-wider">Pesanan Berjalan</span>
+                    <span class="text-2xs font-bold text-ink-faint uppercase tracking-wider">Pesanan Berjalan</span>
                     <a href="{{ route('penghuni.pesanan') }}" class="text-xs font-semibold text-brand hover:text-brand-deep">
                         Lihat semua ({{ $activeOrders->count() }})
                     </a>
@@ -157,20 +208,20 @@
                     <a href="{{ route('penghuni.pesanan') }}" 
                        class="block bg-surface rounded-xl border border-line hover:border-ink-faint p-4 transition-colors shadow-xs group">
                         <div class="flex items-start justify-between gap-2">
-                            <div>
-                                <div class="flex items-center gap-2">
-                                    <span class="font-mono text-xs font-semibold text-ink">{{ $ord->order_code }}</span>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                    <span class="font-mono text-xs font-semibold text-ink break-all">{{ $ord->order_code }}</span>
                                     @if($ord->order_type === 'quick_galon')
-                                        <span class="text-[10px] font-medium text-ink-soft bg-canvas px-2 py-0.5 rounded-full border border-line">Galon</span>
+                                        <span class="text-2xs font-medium text-ink-soft bg-canvas px-2 py-0.5 rounded-full border border-line">Galon</span>
                                     @endif
                                 </div>
-                                <p class="text-xs text-ink-soft font-medium mt-1 truncate max-w-[240px] sm:max-w-xs">
+                                <p class="text-xs text-ink-soft font-medium mt-1 truncate">
                                     {{ $ord->items->pluck('item_name')->join(', ') }}
                                 </p>
                             </div>
-                            <div class="text-right flex-shrink-0">
+                            <div class="text-right shrink-0 max-w-[45%]">
                                 <x-status-badge :status="$ord->status" />
-                                <span class="block text-[11px] text-ink-faint mt-1">
+                                <span class="block text-2xs text-ink-faint mt-1">
                                     diperbarui {{ $ord->updated_at->locale('id')->diffForHumans() }}
                                 </span>
                             </div>
@@ -216,7 +267,7 @@
                               x-text="'Rp ' + selectedGalonPrice.toLocaleString('id-ID') + ' per galon'"></span>
                     </div>
                     <div class="text-right">
-                        <span class="text-[11px] text-ink-faint block font-medium">Subtotal</span>
+                        <span class="text-2xs text-ink-faint block font-medium">Subtotal</span>
                         <span class="text-sm font-bold text-ink tabular-nums whitespace-nowrap" 
                               x-text="galonSubtotalFormatted"></span>
                     </div>
@@ -243,7 +294,7 @@
     <!-- ============================================================== -->
     <div class="lg:col-start-2 lg:row-start-2">
         <div class="bg-surface rounded-xl border border-line p-4 sm:p-5 text-ink shadow-xs space-y-3">
-            <span class="text-[11px] font-bold text-ink-faint uppercase tracking-wider">Informasi Hunian</span>
+            <span class="text-2xs font-bold text-ink-faint uppercase tracking-wider">Informasi Hunian</span>
             
             <!-- Satu Baris Info Kamar -->
             <div class="text-xs text-ink font-medium leading-relaxed">
@@ -305,15 +356,15 @@
                         class="w-full min-h-[44px] p-3 rounded-xl border text-left flex items-center justify-between transition-colors">
                     <div>
                         <p class="text-xs font-bold text-ink">{{ $galon->name }}</p>
-                        <p class="text-[11px] text-ink-soft tabular-nums">{{ $galon->formatted_price }}</p>
+                        <p class="text-2xs text-ink-soft tabular-nums">{{ $galon->formatted_price }}</p>
                     </div>
                     <div class="text-right">
                         @if($galon->stock <= 0)
-                            <span class="text-[10px] font-semibold text-alert">Habis</span>
+                            <span class="text-2xs font-semibold text-alert">Habis</span>
                         @elseif($galon->stock <= $galon->minimum_stock)
-                            <span class="text-[10px] font-semibold text-wait">Sisa sedikit</span>
+                            <span class="text-2xs font-semibold text-wait">Sisa sedikit</span>
                         @else
-                            <span class="text-[10px] text-ink-faint">Tersedia</span>
+                            <span class="text-2xs text-ink-faint">Tersedia</span>
                         @endif
                     </div>
                 </button>

@@ -2,214 +2,227 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
-use Illuminate\Support\Facades\Artisan;
+use App\Jobs\RunStockPrediction;
+use App\Models\AppNotification;
+use App\Models\Order;
+use App\Models\StockPrediction;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
+use Tests\Concerns\CreatesKosFixtures;
 use Tests\TestCase;
 
 class SystemIntegrationTest extends TestCase
 {
-    /**
-     * Test Demo Quick Switcher logins for all 3 roles.
-     */
-    public function test_demo_switcher_works_for_all_roles(): void
-    {
-        // 1. Pengelola
-        $resPengelola = $this->get('/demo-login/pengelola');
-        $resPengelola->assertRedirect(route('pengelola.dashboard'));
-        $this->assertAuthenticated();
-        $this->assertEquals('pengelola', auth()->user()->role);
+    use RefreshDatabase, CreatesKosFixtures;
 
-        // 2. Petugas
-        $resPetugas = $this->get('/demo-login/petugas');
-        $resPetugas->assertRedirect(route('petugas.antrean'));
-        $this->assertAuthenticated();
-        $this->assertEquals('petugas', auth()->user()->role);
-
-        // 3. Penghuni
-        $resPenghuni = $this->get('/demo-login/penghuni');
-        $resPenghuni->assertRedirect(route('penghuni.beranda'));
-        $this->assertAuthenticated();
-        $this->assertEquals('penghuni', auth()->user()->role);
-    }
-
-    /**
-     * Test all Pengelola endpoints return 200 OK.
-     */
     public function test_all_pengelola_pages_load_successfully(): void
     {
-        $pengelola = User::where('role', 'pengelola')->first();
-        $this->actingAs($pengelola);
+        $this->actingAs($this->makeUser('pengelola'));
+        $tenant = $this->makeTenant();
+        $this->makeBill($tenant);
+        $this->makeItem();
 
-        $routes = [
-            'pengelola.dashboard',
-            'pengelola.kamar.index',
-            'pengelola.penghuni.index',
-            'pengelola.tagihan.index',
-            'pengelola.katalog.index',
-            'pengelola.stok.index',
-            'pengelola.laporan.index',
-            'pengelola.prediksi.index',
-        ];
-
-        foreach ($routes as $routeName) {
-            $response = $this->get(route($routeName));
-            $response->assertStatus(200);
+        foreach ([
+            'pengelola.dashboard', 'pengelola.kamar.index', 'pengelola.penghuni.index', 'pengelola.tagihan.index',
+            'pengelola.katalog.index', 'pengelola.stok.index', 'pengelola.laporan.index', 'pengelola.prediksi.index',
+            'pengelola.profil',
+        ] as $routeName) {
+            $this->get(route($routeName))->assertOk();
         }
     }
 
-    /**
-     * Test all Petugas endpoints return 200 OK.
-     */
     public function test_all_petugas_pages_load_successfully(): void
     {
-        $petugas = User::where('role', 'petugas')->first();
-        $this->actingAs($petugas);
+        $this->actingAs($this->makeUser('petugas'));
+        $this->makeItem();
 
-        $routes = [
-            'petugas.antrean',
-            'petugas.stocks.index',
-            'petugas.history',
-        ];
-
-        foreach ($routes as $routeName) {
-            $response = $this->get(route($routeName));
-            $response->assertStatus(200);
+        foreach (['petugas.antrean', 'petugas.dashboard', 'petugas.stocks.index', 'petugas.history', 'petugas.profil'] as $routeName) {
+            $this->get(route($routeName))->assertOk();
         }
     }
 
-    /**
-     * Test all Penghuni endpoints return 200 OK.
-     */
     public function test_all_penghuni_pages_load_successfully(): void
     {
-        $penghuni = User::where('role', 'penghuni')->first();
-        $this->actingAs($penghuni);
+        $tenant = $this->makeTenant();
+        $this->makeBill($tenant);
+        $this->makeItem();
+        $this->makeGalon();
+        $this->actingAs($tenant);
 
-        $routes = [
-            'penghuni.beranda',
-            'penghuni.katalog',
-            'penghuni.pesanan',
-            'penghuni.tagihan',
-        ];
-
-        foreach ($routes as $routeName) {
-            $response = $this->get(route($routeName));
-            $response->assertStatus(200);
+        foreach (['penghuni.beranda', 'penghuni.katalog', 'penghuni.pesanan', 'penghuni.tagihan', 'penghuni.profil'] as $routeName) {
+            $this->get(route($routeName))->assertOk();
         }
     }
 
     /**
-     * Test Machine Learning Prediction Command and DB table persistence.
+     * Atribut x-data/Alpine yang rusak (mis. tanda kutip ganda di dalam atribut) membuat kode JavaScript
+     * tampil sebagai teks biasa di layar. Status 200 tidak menangkap ini, jadi teks yang terlihat diperiksa.
      */
-    public function test_python_ml_stock_prediction_command(): void
+    public function test_pages_do_not_leak_script_code_into_visible_text(): void
     {
-        $exitCode = Artisan::call('stok:prediksi');
-        $this->assertEquals(0, $exitCode);
+        $tenant = $this->makeTenant();
+        $this->makeBill($tenant);
+        $this->makeItem(['stock' => 1, 'minimum_stock' => 5]);
+        $this->makeGalon();
 
-        // Pastikan tabel terisi dengan rekomendasi prediksi
-        $this->assertGreaterThan(0, \App\Models\StockPrediction::count());
-        $firstPrediction = \App\Models\StockPrediction::first();
-        $this->assertNotNull($firstPrediction);
-        $this->assertContains($firstPrediction->status, ['kritis', 'waspada', 'aman']);
+        $pages = [
+            [$this->makeUser('pengelola'), ['pengelola.dashboard', 'pengelola.kamar.index', 'pengelola.penghuni.index', 'pengelola.tagihan.index', 'pengelola.katalog.index', 'pengelola.stok.index', 'pengelola.laporan.index', 'pengelola.prediksi.index', 'pengelola.profil']],
+            [$this->makeUser('petugas'), ['petugas.antrean', 'petugas.stocks.index', 'petugas.history', 'petugas.profil']],
+            [$tenant, ['penghuni.beranda', 'penghuni.katalog', 'penghuni.pesanan', 'penghuni.tagihan', 'penghuni.profil']],
+        ];
+
+        foreach ($pages as [$user, $routes]) {
+            $this->actingAs($user);
+
+            foreach ($routes as $routeName) {
+                $visible = $this->visibleText($this->get(route($routeName))->assertOk()->getContent());
+
+                foreach (['return this.', 'this.selectedItem', 'x-data', '=> {', 'canSubmit'] as $codeFragment) {
+                    $this->assertStringNotContainsString($codeFragment, $visible, "Kode muncul sebagai teks di halaman {$routeName}");
+                }
+            }
+        }
     }
 
-    /**
-     * Test web action trigger "Hitung Ulang Prediksi" via Controller POST route.
-     */
-    public function test_pengelola_can_trigger_prediction_calculation_via_web(): void
+    private function visibleText(string $html): string
     {
-        $pengelola = User::where('role', 'pengelola')->first();
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="utf-8" ?>' . $html);
+        libxml_clear_errors();
+
+        foreach (['script', 'style', 'template'] as $tag) {
+            $nodes = iterator_to_array($dom->getElementsByTagName($tag));
+            foreach ($nodes as $node) {
+                $node->parentNode?->removeChild($node);
+            }
+        }
+
+        return $dom->getElementsByTagName('body')->item(0)?->textContent ?? '';
+    }
+
+    public function test_monthly_report_totals_and_invalid_period_fallback(): void
+    {
+        $pengelola = $this->makeUser('pengelola');
+        $tenant = $this->makeTenant();
+        $item = $this->makeItem(['category' => 'galon']);
+
+        $this->makeBill($tenant, ['status' => 'lunas', 'month' => 11, 'year' => 2026]);
+
+        $order = Order::create([
+            'order_code' => 'ORD-R-1', 'user_id' => $tenant->id, 'room_number' => 'A-1', 'order_type' => 'regular',
+            'total_amount' => 36000, 'status' => 'selesai', 'payment_status' => 'lunas',
+            'created_at' => '2026-11-03 10:00:00', 'updated_at' => '2026-11-03 10:00:00', 'completed_at' => '2026-11-03 10:20:00',
+        ]);
+        $order->items()->create(['catalog_item_id' => $item->id, 'item_name' => $item->name, 'quantity' => 2, 'unit_price' => 18000, 'subtotal' => 36000]);
+
         $this->actingAs($pengelola);
 
-        $response = $this->post(route('pengelola.prediksi.calculate'));
-        $response->assertRedirect(route('pengelola.prediksi.index'));
-        $response->assertSessionHas('success');
+        $response = $this->get(route('pengelola.laporan.index', ['month' => 11, 'year' => 2026]))->assertOk();
+        $this->assertSame(36000, (int) $response->viewData('totalServiceSales'));
+        $this->assertSame(850000, (int) $response->viewData('totalRentPaid'));
+        $this->assertSame(36000, (int) $response->viewData('galonSales'));
+        $this->assertSame(36000, $response->viewData('dailyServiceSales')[2], 'Hari ke-3 harus berisi penjualan 3 Nov.');
+        $this->assertCount(30, $response->viewData('dailyLabels'));
+
+        // Bulan tidak valid tidak boleh menyebabkan error 500.
+        $this->get(route('pengelola.laporan.index', ['month' => 13, 'year' => 2026]))->assertOk();
+        $this->get(route('pengelola.laporan.index', ['month' => 'abc']))->assertOk();
     }
 
-    /**
-     * Test pengelola can apply 1-click restock directly from prediction page.
-     */
+    public function test_trigger_prediction_dispatches_job_after_response_without_blocking(): void
+    {
+        Bus::fake();
+        $this->actingAs($this->makeUser('pengelola'));
+
+        $this->post(route('pengelola.prediksi.calculate'))
+            ->assertRedirect(route('pengelola.prediksi.index'))
+            ->assertSessionHas('success');
+
+        Bus::assertDispatchedAfterResponse(RunStockPrediction::class);
+    }
+
+    public function test_prediction_trigger_is_ignored_while_a_run_is_in_progress(): void
+    {
+        Bus::fake();
+        Cache::put(RunStockPrediction::RUNNING_CACHE_KEY, true, now()->addMinutes(5));
+        $this->actingAs($this->makeUser('pengelola'));
+
+        $this->post(route('pengelola.prediksi.calculate'))->assertSessionHas('info');
+
+        Bus::assertNotDispatchedAfterResponse(RunStockPrediction::class);
+    }
+
+    public function test_prediction_page_hides_deleted_items_and_shows_running_state(): void
+    {
+        $this->actingAs($this->makeUser('pengelola'));
+        $kept = $this->makeItem(['name' => 'Menu Dipertahankan']);
+        $gone = $this->makeItem(['name' => 'Menu Dihapus Sudah']);
+
+        foreach ([$kept, $gone] as $item) {
+            StockPrediction::create([
+                'catalog_item_id' => $item->id, 'predicted_demand_qty' => 10, 'target_stock' => 15, 'current_stock' => 3,
+                'recommended_restock_qty' => 12, 'daily_avg_sales' => 1.4, 'safety_stock' => 5, 'sales_trend' => 'stabil',
+                'status' => 'kritis', 'confidence_score' => 0.8, 'calculated_at' => now(),
+            ]);
+        }
+        $gone->delete();
+        Cache::put(RunStockPrediction::RUNNING_CACHE_KEY, true, now()->addMinutes(5));
+
+        $this->get(route('pengelola.prediksi.index'))
+            ->assertOk()
+            ->assertSee('Menu Dipertahankan')
+            ->assertDontSee('Menu Dihapus Sudah')
+            ->assertSee('Sedang dihitung di latar belakang');
+    }
+
     public function test_pengelola_can_apply_1_click_restock_from_prediction(): void
     {
-        $pengelola = User::where('role', 'pengelola')->first();
-        $this->actingAs($pengelola);
-
-        $prediction = \App\Models\StockPrediction::first();
-        $item = $prediction->catalogItem;
-        $initialStock = $item->stock;
-
-        $response = $this->post(route('pengelola.prediksi.restock', $prediction->id), [
-            'quantity' => 10,
-            'notes' => 'Test 1-click restock',
+        $this->actingAs($this->makeUser('pengelola'));
+        $item = $this->makeItem(['stock' => 3]);
+        $prediction = StockPrediction::create([
+            'catalog_item_id' => $item->id, 'predicted_demand_qty' => 10, 'target_stock' => 15, 'current_stock' => 3,
+            'recommended_restock_qty' => 12, 'daily_avg_sales' => 1.4, 'safety_stock' => 5, 'sales_trend' => 'stabil',
+            'status' => 'kritis', 'confidence_score' => 0.8, 'calculated_at' => now(),
         ]);
 
-        $response->assertRedirect(route('pengelola.prediksi.index'));
-        $response->assertSessionHas('success');
+        $this->post(route('pengelola.prediksi.restock', $prediction->id), ['quantity' => 10, 'notes' => 'Test'])
+            ->assertRedirect(route('pengelola.prediksi.index'))
+            ->assertSessionHas('success');
 
-        $this->assertEquals($initialStock + 10, $item->fresh()->stock);
-        $this->assertDatabaseHas('stock_logs', [
-            'catalog_item_id' => $item->id,
-            'quantity' => 10,
-            'reference_type' => 'restock_ai',
-        ]);
+        $this->assertSame(13, $item->fresh()->stock);
+        $this->assertDatabaseHas('stock_logs', ['catalog_item_id' => $item->id, 'quantity' => 10, 'reference_type' => 'restock_ai']);
+        $this->assertSame(13, $prediction->fresh()->current_stock);
     }
 
-    /**
-     * Test user can mark a single unread notification as read on tap.
-     */
-    public function test_user_can_mark_single_notification_as_read(): void
+    public function test_user_can_mark_single_notification_as_read_but_not_others(): void
     {
-        $user = User::where('role', 'penghuni')->first();
+        $user = $this->makeTenant();
+        $stranger = $this->makeTenant();
         $this->actingAs($user);
 
-        $notif = \App\Models\AppNotification::create([
-            'user_id' => $user->id,
-            'title' => 'Test Notifikasi Unread',
-            'message' => 'Notifikasi belum dibaca untuk pengetesan',
-            'type' => 'system',
-            'action_url' => '/penghuni/tagihan',
-            'is_read' => false,
-        ]);
+        $mine = AppNotification::create(['user_id' => $user->id, 'title' => 'Uji', 'message' => 'Uji', 'type' => 'system', 'is_read' => false]);
+        $theirs = AppNotification::create(['user_id' => $stranger->id, 'title' => 'Uji', 'message' => 'Uji', 'type' => 'system', 'is_read' => false]);
 
-        $this->assertFalse($notif->is_read);
+        $this->postJson(route('notifications.read', $mine->id))->assertOk()->assertJson(['success' => true]);
+        $this->assertTrue($mine->fresh()->is_read);
 
-        // POST /notifications/{id}/read
-        $response = $this->postJson(route('notifications.read', $notif->id));
-        $response->assertStatus(200);
-        $response->assertJson(['success' => true]);
-
-        $this->assertTrue($notif->fresh()->is_read);
-        $this->assertNotNull($notif->fresh()->read_at);
+        $this->postJson(route('notifications.read', $theirs->id))->assertNotFound();
+        $this->assertFalse($theirs->fresh()->is_read);
     }
 
-    /**
-     * Test user can mark all notifications as read at once.
-     */
     public function test_user_can_mark_all_notifications_as_read(): void
     {
-        $user = User::where('role', 'penghuni')->first();
+        $user = $this->makeTenant();
         $this->actingAs($user);
 
-        \App\Models\AppNotification::create([
-            'user_id' => $user->id,
-            'title' => 'Notifikasi 1',
-            'message' => 'Belum dibaca 1',
-            'is_read' => false,
-        ]);
+        foreach ([1, 2] as $n) {
+            AppNotification::create(['user_id' => $user->id, 'title' => "N{$n}", 'message' => 'Belum dibaca', 'type' => 'system', 'is_read' => false]);
+        }
 
-        \App\Models\AppNotification::create([
-            'user_id' => $user->id,
-            'title' => 'Notifikasi 2',
-            'message' => 'Belum dibaca 2',
-            'is_read' => false,
-        ]);
-
-        $this->assertGreaterThanOrEqual(2, $user->unreadNotificationsCount());
-
-        $response = $this->postJson(route('notifications.read_all'));
-        $response->assertStatus(200);
-        $response->assertJson(['success' => true, 'unread_count' => 0]);
-
-        $this->assertEquals(0, $user->unreadNotificationsCount());
+        $this->assertSame(2, $user->unreadNotificationsCount());
+        $this->postJson(route('notifications.read_all'))->assertOk()->assertJson(['success' => true, 'unread_count' => 0]);
+        $this->assertSame(0, $user->unreadNotificationsCount());
     }
 }

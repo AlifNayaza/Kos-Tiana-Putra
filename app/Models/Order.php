@@ -64,6 +64,46 @@ class Order extends Model
         };
     }
 
+    /**
+     * Apakah metode pembayaran tergolong tunai? Membaca config('kos.payment_methods'),
+     * dengan cadangan pencocokan teks untuk data lama.
+     */
+    public static function isCashMethod(?string $method): bool
+    {
+        if ($method === null || trim($method) === '') {
+            return true;
+        }
+
+        $configured = config('kos.payment_methods');
+        if (isset($configured[$method])) {
+            return (bool) $configured[$method]['cash'];
+        }
+
+        $lower = strtolower($method);
+
+        return str_contains($lower, 'tunai') || str_contains($lower, 'cash');
+    }
+
+    public function getIsCashAttribute(): bool
+    {
+        return self::isCashMethod($this->payment_method);
+    }
+
+    /**
+     * Tanda perubahan antrean aktif (jumlah + waktu pembaruan terakhir) dalam SATU query ringan.
+     * Klien membandingkannya dulu; HTML penuh hanya diunduh bila tandanya berubah.
+     */
+    public static function activitySignature(?int $userId = null): string
+    {
+        $row = static::query()
+            ->whereIn('status', ['menunggu', 'diproses', 'diantar'])
+            ->when($userId, fn ($q) => $q->where('user_id', $userId))
+            ->selectRaw('COUNT(*) as c, MAX(updated_at) as m')
+            ->first();
+
+        return ((int) $row->c) . '|' . ($row->m ?? '');
+    }
+
     public function isCancellable(): bool
     {
         return $this->status === 'menunggu';

@@ -14,7 +14,7 @@
     <!-- Header Halaman -->
     <div class="flex items-center justify-between pb-1">
         <div>
-            <h1 class="text-base sm:text-lg font-bold text-ink">Tagihan Sewa</h1>
+            <h1 class="text-3xl text-brand-deep">Tagihan Sewa</h1>
             <p class="text-xs text-ink-soft">Tagihan sewa kamar dan riwayat pembayaran resmi</p>
         </div>
     </div>
@@ -46,7 +46,7 @@
                         </div>
 
                         <div class="text-right">
-                            <span class="text-[11px] text-ink-faint block font-medium">Jatuh Tempo</span>
+                            <span class="text-2xs text-ink-faint block font-medium">Jatuh Tempo</span>
                             <span class="text-xs font-semibold {{ $activeBill->is_overdue ? 'text-alert' : 'text-ink' }}">
                                 {{ $activeBill->due_date ? $activeBill->due_date->translatedFormat('d F Y') : '-' }}
                             </span>
@@ -75,7 +75,7 @@
                             <div>
                                 <span class="text-xs font-bold text-ink block">Total Tagihan</span>
                                 @if($activeBill->is_overdue)
-                                    <span class="text-[11px] font-semibold text-alert">
+                                    <span class="text-2xs font-semibold text-alert">
                                         Menunggak {{ $activeBill->days_overdue > 0 ? $activeBill->days_overdue . ' hari' : '' }}
                                     </span>
                                 @endif
@@ -95,7 +95,7 @@
                                 </svg>
                                 <div>
                                     <p class="font-bold">Tagihan telah lunas terverifikasi</p>
-                                    <p class="text-[11px] text-ink-soft mt-0.5">
+                                    <p class="text-2xs text-ink-soft mt-0.5">
                                         Diverifikasi pada {{ $activeBill->payment_date ? $activeBill->payment_date->translatedFormat('d M Y, H:i') : '-' }} &bull; Metode: {{ $activeBill->payment_method ?? 'Transfer' }}
                                     </p>
                                 </div>
@@ -108,7 +108,7 @@
                                     </svg>
                                     <div>
                                         <p class="font-bold">Bukti pembayaran sedang dicek pengelola</p>
-                                        <p class="text-[11px] text-ink-soft mt-0.5">
+                                        <p class="text-2xs text-ink-soft mt-0.5">
                                             Bukti transfer telah dikirim. Pengelola akan mengonfirmasi status pelunasan dalam 1x24 jam.
                                         </p>
                                     </div>
@@ -150,9 +150,9 @@
                             <div class="min-w-0">
                                 <div class="flex items-center gap-2">
                                     <span class="font-bold text-ink">{{ $bill->period_label }}</span>
-                                    <span class="font-mono text-[10px] text-ink-faint select-all">{{ $bill->bill_code }}</span>
+                                    <span class="font-mono text-2xs text-ink-faint select-all">{{ $bill->bill_code }}</span>
                                 </div>
-                                <p class="text-[11px] text-ink-soft mt-0.5">
+                                <p class="text-2xs text-ink-soft mt-0.5">
                                     Jatuh tempo: {{ $bill->due_date ? $bill->due_date->translatedFormat('d M Y') : '-' }}
                                     @if($bill->payment_date)
                                         &bull; Bayar: {{ $bill->payment_date->translatedFormat('d/m/Y') }}
@@ -186,7 +186,7 @@
             
             <!-- Kotak Info Rekening Berborder Biasa (Bukan Kartu Kredit Gradasi) -->
             <div class="bg-surface rounded-xl border border-line p-4 sm:p-5 text-ink shadow-xs space-y-3">
-                <span class="text-[11px] font-bold text-ink-faint uppercase tracking-wider block">
+                <span class="text-2xs font-bold text-ink-faint uppercase tracking-wider block">
                     Rekening Pembayaran Resmi
                 </span>
 
@@ -214,10 +214,10 @@
 
                 <!-- Langkah Bayar Singkat -->
                 <div class="pt-2 border-t border-line text-xs text-ink-soft space-y-2">
-                    <span class="font-semibold text-ink text-[11px] uppercase tracking-wider block">
+                    <span class="font-semibold text-ink text-2xs uppercase tracking-wider block">
                         Petunjuk Transfer:
                     </span>
-                    <ol class="list-decimal list-inside space-y-1 text-[11px] leading-relaxed text-ink-soft">
+                    <ol class="list-decimal list-inside space-y-1 text-2xs leading-relaxed text-ink-soft">
                         <li>Transfer nominal tagihan ke rekening BCA di atas.</li>
                         <li>Simpan tangkapan layar atau struk bukti transfer.</li>
                         <li>Klik <strong>Unggah Bukti Pembayaran</strong> di samping.</li>
@@ -227,18 +227,18 @@
 
             <!-- Kontak Bantuan WhatsApp (Tanpa Tanda Kurung Ganda) -->
             <div class="bg-surface rounded-xl border border-line p-4 text-xs shadow-xs space-y-2">
-                <span class="text-[11px] font-bold text-ink-faint uppercase tracking-wider block">
+                <span class="text-2xs font-bold text-ink-faint uppercase tracking-wider block">
                     Bantuan Pembayaran
                 </span>
-                <p class="text-ink-soft leading-relaxed text-[11px]">
+                <p class="text-ink-soft leading-relaxed text-2xs">
                     Jika membutuhkan bantuan atau verifikasi manual, hubungi pengelola via WhatsApp:
                 </p>
                 <div class="flex items-center justify-between pt-1">
                     <div class="min-w-0 pr-2">
                         <span class="font-bold text-ink block truncate">{{ $paymentInfo['whatsapp_cs'] }}</span>
-                        <span class="text-[11px] text-ink-soft truncate block">{{ $paymentInfo['owner_name'] }}</span>
+                        <span class="text-2xs text-ink-soft truncate block">{{ $paymentInfo['owner_name'] }}</span>
                     </div>
-                    <a href="https://wa.me/6281234567890?text={{ urlencode('Halo Pak H. Tiana, saya penghuni ' . ($room ? $room->room_number : '') . ' ingin konfirmasi pembayaran sewa.') }}" 
+                    <a href="{{ \App\Support\Phone::whatsappUrl($paymentInfo['whatsapp_cs'], 'Halo, saya penghuni ' . ($room ? $room->room_number : '') . ' ingin konfirmasi pembayaran sewa.') }}" 
                        target="_blank" 
                        rel="noopener"
                        class="min-h-[44px] px-3.5 py-1.5 border border-line rounded-xl text-xs font-semibold text-brand hover:bg-canvas transition-colors flex items-center justify-center flex-shrink-0">
@@ -289,7 +289,7 @@
                            accept="image/jpeg,image/png,image/jpg,image/webp" 
                            required 
                             class="block w-full text-xs text-ink-soft file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-canvas file:text-ink-soft hover:file:bg-line cursor-pointer border border-line rounded-xl p-1 bg-surface">
-                    <span class="text-[10px] text-ink-faint mt-1 block">Format JPG, PNG, atau WEBP (maksimal 4MB).</span>
+                    <span class="text-2xs text-ink-faint mt-1 block">Format JPG, PNG, atau WEBP (maksimal 4MB).</span>
                 </div>
 
                 <!-- Catatan Opsional -->

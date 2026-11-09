@@ -37,19 +37,19 @@
             <div class="flex items-center gap-1.5 flex-wrap">
                 <h3 class="text-sm font-semibold text-ink leading-tight truncate">{{ $item->name }}</h3>
                 @if($status === 'habis')
-                    <span class="inline-flex items-center gap-1 text-[11px] font-medium text-alert shrink-0">
+                    <span class="inline-flex items-center gap-1 text-2xs font-medium text-alert shrink-0">
                         <span class="w-1.5 h-1.5 rounded-full bg-alert"></span>
                         <span>Habis</span>
                     </span>
                 @elseif($status === 'menipis')
-                    <span class="inline-flex items-center gap-1 text-[11px] font-medium text-wait shrink-0">
+                    <span class="inline-flex items-center gap-1 text-2xs font-medium text-wait shrink-0">
                         <span class="w-1.5 h-1.5 rounded-full bg-wait"></span>
                         <span>Menipis</span>
                     </span>
                 @endif
             </div>
 
-            <div class="flex items-center gap-1.5 mt-0.5 text-[11px] text-ink-faint">
+            <div class="flex items-center gap-1.5 mt-0.5 text-2xs text-ink-faint">
                 <span class="capitalize">{{ $item->unit }}</span>
                 @if($historyText)
                     <span>&bull;</span>
@@ -71,7 +71,7 @@
                          style="left: {{ $thresholdPercent }}%"
                          title="Batas minimum: {{ $item->minimum_stock }}"></div>
                 </div>
-                <span class="text-[10px] text-ink-faint tabular-nums leading-none">batas {{ $item->minimum_stock }}</span>
+                <span class="text-2xs text-ink-faint tabular-nums leading-none">batas {{ $item->minimum_stock }}</span>
             </div>
 
             <!-- Angka Stok Utama (Paling Menonjol) -->

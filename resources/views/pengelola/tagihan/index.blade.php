@@ -25,7 +25,7 @@
                 <div class="mt-2 text-2xl font-extrabold text-done tabular-nums">
                     Rp {{ number_format($stats['lunas_sum'], 0, ',', '.') }}
                 </div>
-                <p class="text-[11px] text-ink-faint mt-1">Periode {{ \Carbon\Carbon::create(null, $monthFilter)->translatedFormat('F') }} {{ $yearFilter }}</p>
+                <p class="text-2xs text-ink-faint mt-1">Periode {{ is_numeric($monthFilter) ? \Carbon\Carbon::create(null, (int) $monthFilter)->translatedFormat('F') : 'Semua bulan' }} {{ is_numeric($yearFilter) ? $yearFilter : 'Semua tahun' }}</p>
             </div>
             <div class="w-12 h-12 rounded-xl bg-done-wash border border-done/20 text-done flex items-center justify-center flex-shrink-0">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -41,7 +41,7 @@
                 <div class="mt-2 text-2xl font-extrabold text-alert tabular-nums">
                     Rp {{ number_format($stats['menunggu_sum'], 0, ',', '.') }}
                 </div>
-                <p class="text-[11px] text-ink-faint mt-1">Belum terlunasi</p>
+                <p class="text-2xs text-ink-faint mt-1">Belum terlunasi</p>
             </div>
             <div class="w-12 h-12 rounded-xl bg-alert-wash border border-alert/20 text-alert flex items-center justify-center flex-shrink-0">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -60,7 +60,7 @@
                         Bukti Masuk
                     </span>
                 </div>
-                <p class="text-[11px] text-ink-faint mt-1">Menunggu validasi pengelola</p>
+                <p class="text-2xs text-ink-faint mt-1">Menunggu validasi pengelola</p>
             </div>
             <div class="w-12 h-12 rounded-xl bg-brand-wash border border-brand/20 text-brand flex items-center justify-center flex-shrink-0">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -76,7 +76,7 @@
                 <div class="mt-2 text-2xl font-extrabold text-ink tabular-nums">
                     {{ $stats['total_bills'] }}
                 </div>
-                <p class="text-[11px] text-ink-faint mt-1">Seluruh kamar aktif</p>
+                <p class="text-2xs text-ink-faint mt-1">Seluruh kamar aktif</p>
             </div>
             <div class="w-12 h-12 rounded-xl bg-canvas border border-line text-ink flex items-center justify-center flex-shrink-0">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -156,7 +156,7 @@
     <!-- Bills Table -->
     <div class="bg-surface rounded-2xl border border-line shadow-xs overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
+            <table class="w-full text-left text-xs table-stack">
                 <thead>
                     <tr class="bg-canvas border-b border-line text-ink-soft uppercase tracking-wider font-semibold">
                         <th class="py-3.5 px-4 sm:px-6">Tagihan & Kamar</th>
@@ -174,39 +174,39 @@
                         @endphp
                         <tr class="hover:bg-canvas transition-colors">
                             <!-- Tagihan & Kamar -->
-                            <td class="py-4 px-4 sm:px-6">
+                            <td class="py-4 px-4 sm:px-6" data-primary>
                                 <div class="flex items-center space-x-3">
                                     <div class="w-9 h-9 rounded-xl bg-canvas text-ink font-bold flex items-center justify-center text-xs flex-shrink-0">
                                         {{ $bill->room ? str_replace('Kamar ', '', $bill->room->room_number) : '??' }}
                                     </div>
                                     <div>
                                         <p class="font-bold text-ink leading-tight">{{ $bill->room->room_number ?? '-' }}</p>
-                                        <p class="text-ink-soft font-mono text-[11px] mt-0.5">{{ $bill->bill_code }}</p>
-                                        <span class="text-[10px] text-ink-faint block mt-0.5">Bulan {{ $bill->period_label }}</span>
+                                        <p class="text-ink-soft font-mono text-2xs mt-0.5">{{ $bill->bill_code }}</p>
+                                        <span class="text-2xs text-ink-faint block mt-0.5">Bulan {{ $bill->period_label }}</span>
                                     </div>
                                 </div>
                             </td>
 
                             <!-- Penghuni -->
-                            <td class="py-4 px-4">
+                            <td class="py-4 px-4" data-label="Penghuni"><div class="cell-value">
                                 @if($bill->tenantProfile && $bill->tenantProfile->user)
                                     <p class="font-bold text-ink">{{ $bill->tenantProfile->user->name }}</p>
-                                    <p class="text-ink-soft text-[11px]">{{ $bill->tenantProfile->user->phone ?? '-' }}</p>
+                                    <p class="text-ink-soft text-2xs">{{ $bill->tenantProfile->user->phone ?? '-' }}</p>
                                 @else
                                     <span class="text-ink-faint italic">Penghuni telah checkout</span>
                                 @endif
-                            </td>
+                            </div></td>
 
                             <!-- Nominal -->
-                            <td class="py-4 px-4 whitespace-nowrap">
+                            <td class="py-4 px-4 whitespace-nowrap" data-label="Nominal"><div class="cell-value">
                                 <div class="text-sm font-extrabold text-ink tabular-nums">
                                     {{ $bill->formatted_amount }}
                                 </div>
-                                <span class="text-[10px] text-ink-faint">Sewa 1 Bulan Penuh</span>
-                            </td>
+                                <span class="text-2xs text-ink-faint">Sewa 1 Bulan Penuh</span>
+                            </div></td>
 
                             <!-- Jatuh Tempo -->
-                            <td class="py-4 px-4 whitespace-nowrap">
+                            <td class="py-4 px-4 whitespace-nowrap" data-label="Jatuh tempo"><div class="cell-value">
                                 @php
                                     $isPastDue = \Carbon\Carbon::parse($bill->due_date)->isPast() && $bill->status !== 'lunas';
                                 @endphp
@@ -214,20 +214,20 @@
                                     {{ \Carbon\Carbon::parse($bill->due_date)->format('d M Y') }}
                                 </div>
                                 @if($isPastDue)
-                                    <span class="text-[10px] text-alert font-semibold">Lewat Jatuh Tempo</span>
+                                    <span class="text-2xs text-alert font-semibold">Lewat Jatuh Tempo</span>
                                 @endif
-                            </td>
+                            </div></td>
 
                             <!-- Status & Bukti Transfer -->
-                            <td class="py-4 px-4">
+                            <td class="py-4 px-4" data-label="Status"><div class="cell-value">
                                 <div class="space-y-1.5">
                                     <x-status-badge :status="$bill->status" :label="$badge['label']" />
 
                                     <!-- Bukti Upload -->
                                     @if($bill->payment_proof)
                                         <button type="button" 
-                                                @click="viewProof('{{ asset('storage/' . $bill->payment_proof) }}', 'Bukti Pembayaran {{ $bill->bill_code }}')" 
-                                                class="inline-flex items-center space-x-1 text-[11px] font-bold text-brand bg-brand-wash hover:bg-brand-wash/80 px-2 py-0.5 rounded border border-brand/20 transition-colors">
+                                                @click="viewProof('{{ route('tagihan.proof', $bill) }}', 'Bukti Pembayaran {{ $bill->bill_code }}')" 
+                                                class="inline-flex items-center space-x-1 text-2xs font-bold text-brand bg-brand-wash hover:bg-brand-wash/80 px-2 py-0.5 rounded border border-brand/20 transition-colors">
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -235,17 +235,27 @@
                                             <span>Lihat Bukti Struk</span>
                                         </button>
                                     @elseif($bill->status === 'lunas')
-                                        <span class="text-[10px] text-ink-faint block">Diverifikasi Tunai / Bank</span>
+                                        <span class="text-2xs text-ink-faint block">Diverifikasi Tunai / Bank</span>
                                     @else
-                                        <span class="text-[10px] text-ink-faint italic block">Belum ada struk</span>
+                                        <span class="text-2xs text-ink-faint italic block">Belum ada struk</span>
                                     @endif
                                 </div>
-                            </td>
+                            </div></td>
 
                             <!-- Aksi Konfirmasi -->
-                            <td class="py-4 px-4 sm:px-6 text-right whitespace-nowrap">
+                            <td class="py-4 px-4 sm:px-6 text-right whitespace-nowrap" data-actions>
                                 @if($bill->status !== 'lunas')
-                                    <div class="flex items-center justify-end space-x-2">
+                                    <div class="flex flex-wrap items-center justify-end gap-2">
+                                        @if($bill->reminder_url)
+                                            <!-- Ingatkan penghuni lewat WhatsApp (pesan sudah terisi) -->
+                                            <a href="{{ $bill->reminder_url }}" target="_blank" rel="noopener"
+                                               class="inline-flex items-center gap-1.5 text-xs font-semibold text-ink bg-surface hover:bg-brand-wash px-2.5 py-1.5 rounded-lg border border-line transition-colors">
+                                                <svg class="w-3.5 h-3.5 text-done" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h8M8 14h5m-9 6l1.6-4.2A8 8 0 1112 20a8 8 0 01-3.6-.9L4 20z"/></svg>
+                                                <span>Ingatkan WA</span>
+                                                <span class="sr-only">{{ $bill->tenantProfile?->user?->name }}</span>
+                                            </a>
+                                        @endif
+
                                         <!-- Tombol Konfirmasi Lunas -->
                                         <form action="{{ route('pengelola.tagihan.confirm', $bill->id) }}" method="POST" 
                                               onsubmit="return confirm('Konfirmasi penerimaan pembayaran sewa sebesar {{ $bill->formatted_amount }} untuk {{ $bill->room->room_number }}?');">
@@ -272,14 +282,14 @@
                                         @endif
                                     </div>
                                 @else
-                                    <div class="text-[11px] text-ink-soft">
+                                    <div class="text-2xs text-ink-soft">
                                         <span class="text-done font-bold flex items-center justify-end">
                                             <svg class="w-3.5 h-3.5 mr-1 text-done" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                             </svg>
                                             Terverifikasi Lunas
                                         </span>
-                                        <span class="text-[10px] text-ink-faint block mt-0.5">
+                                        <span class="text-2xs text-ink-faint block mt-0.5">
                                             {{ $bill->confirmer->name ?? 'Pengelola' }} ({{ $bill->payment_date ? \Carbon\Carbon::parse($bill->payment_date)->format('d/m/Y') : '' }})
                                         </span>
                                     </div>
@@ -329,8 +339,10 @@
                     </button>
                 </div>
 
-                <form action="{{ route('pengelola.tagihan.generate') }}" method="POST" class="mt-4 space-y-4">
+                <form action="{{ route('pengelola.tagihan.generate') }}" method="POST" class="mt-4 space-y-4" data-restore="tagihan-terbit" data-open-var="generateModalOpen">
                     @csrf
+                    <input type="hidden" name="_restore" value="tagihan-terbit">
+                    <x-form-errors form="tagihan-terbit" />
 
                     <div class="grid grid-cols-2 gap-3">
                         <div>
@@ -342,6 +354,7 @@
                                     </option>
                                 @endfor
                             </select>
+                        <x-field-error name="month" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink mb-1">Tahun <span class="text-alert">*</span></label>
@@ -350,6 +363,7 @@
                                     <option value="{{ $y }}" {{ date('Y') == $y ? 'selected' : '' }}>{{ $y }}</option>
                                 @endforeach
                             </select>
+                        <x-field-error name="year" />
                         </div>
                     </div>
 
@@ -357,12 +371,13 @@
                         <label class="block text-xs font-semibold text-ink mb-1">Batas Waktu Jatuh Tempo <span class="text-alert">*</span></label>
                         <input type="date" name="due_date" value="{{ date('Y-m-10', strtotime('+1 month')) }}" required 
                                class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
-                        <p class="text-[11px] text-ink-faint mt-1">Standar jatuh tempo Kos Tiana Putra 1: Tanggal 10 setiap bulan.</p>
+                        <x-field-error name="due_date" />
+                        <p class="text-2xs text-ink-faint mt-1">Standar jatuh tempo Kos Tiana Putra 1: Tanggal 10 setiap bulan.</p>
                     </div>
 
                     <div class="p-3 bg-brand-wash rounded-xl border border-brand/20 text-xs text-brand">
                         <p class="font-semibold">Informasi Sistem:</p>
-                        <p class="text-[11px] mt-0.5">Sistem akan otomatis men-generate tagihan sebesar harga sewa masing-masing kamar dan mengirimkan notifikasi ke aplikasi seluruh penghuni aktif.</p>
+                        <p class="text-2xs mt-0.5">Sistem akan otomatis men-generate tagihan sebesar harga sewa masing-masing kamar dan mengirimkan notifikasi ke aplikasi seluruh penghuni aktif.</p>
                     </div>
 
                     <div class="pt-4 border-t border-line flex items-center justify-end space-x-3">

@@ -153,7 +153,7 @@
                         <div>
                             <div class="flex items-center space-x-2">
                                 <h3 class="text-base font-bold text-ink tracking-tight">{{ $room->room_number }}</h3>
-                                <span class="text-[11px] font-semibold text-ink-soft bg-canvas px-2 py-0.5 rounded-md">
+                                <span class="text-2xs font-semibold text-ink-soft bg-canvas px-2 py-0.5 rounded-md">
                                     Lt. {{ $room->floor }}
                                 </span>
                             </div>
@@ -176,15 +176,15 @@
                         @if($room->status === 'terisi' && $tenant)
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center space-x-2">
-                                    <div class="w-7 h-7 rounded-full bg-brand-wash text-brand font-bold flex items-center justify-center text-[10px]">
+                                    <div class="w-7 h-7 rounded-full bg-brand-wash text-brand font-bold flex items-center justify-center text-2xs">
                                         {{ substr($tenant->user->name ?? 'P', 0, 1) }}
                                     </div>
                                     <div>
                                         <p class="font-bold text-ink leading-tight">{{ $tenant->user->name ?? 'Penghuni' }}</p>
-                                        <p class="text-[11px] text-ink-soft">{{ $tenant->user->phone ?? '-' }}</p>
+                                        <p class="text-2xs text-ink-soft">{{ $tenant->user->phone ?? '-' }}</p>
                                     </div>
                                 </div>
-                                <span class="text-[10px] text-ink-faint font-medium">Huni sejak {{ \Carbon\Carbon::parse($tenant->start_date)->format('d M Y') }}</span>
+                                <span class="text-2xs text-ink-faint font-medium">Huni sejak {{ \Carbon\Carbon::parse($tenant->start_date)->format('d M Y') }}</span>
                             </div>
                         @elseif($room->status === 'perbaikan')
                             <div class="flex items-center space-x-2 text-wait">
@@ -205,7 +205,7 @@
 
                     <!-- Facilities List -->
                     <div class="mt-3">
-                        <p class="text-[11px] font-semibold text-ink-faint uppercase tracking-wider mb-1.5">Fasilitas</p>
+                        <p class="text-2xs font-semibold text-ink-faint uppercase tracking-wider mb-1.5">Fasilitas</p>
                         <p class="text-xs text-ink-soft leading-relaxed">{{ $room->facilities }}</p>
                     </div>
                 </div>
@@ -227,7 +227,7 @@
                             </button>
                         </form>
                     @else
-                        <span class="text-[10px] text-ink-faint font-medium" title="Kamar terisi tidak dapat dihapus">
+                        <span class="text-2xs text-ink-faint font-medium" title="Kamar terisi tidak dapat dihapus">
                             Terkunci (Terisi)
                         </span>
                     @endif
@@ -263,8 +263,12 @@
                     </button>
                 </div>
 
-                <form :action="editUrl" method="POST" class="mt-4 space-y-4">
+                <form :action="editUrl" method="POST" class="mt-4 space-y-4" data-restore="kamar" data-open-var="modalOpen" data-url-var="editUrl" data-edit-var="isEdit">
                     @csrf
+                    <input type="hidden" name="_restore" value="kamar">
+                    <input type="hidden" name="_action" :value="editUrl">
+                    <input type="hidden" name="_edit" :value="isEdit ? 1 : 0">
+                    <x-form-errors form="kamar" />
                     <template x-if="isEdit">
                         <input type="hidden" name="_method" value="PUT">
                     </template>
@@ -274,6 +278,7 @@
                             <label class="block text-xs font-semibold text-ink mb-1">Nomor Kamar <span class="text-alert">*</span></label>
                             <input type="text" name="room_number" x-model="roomForm.room_number" required placeholder="Contoh: Kamar A-04" 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="room_number" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink mb-1">Lantai <span class="text-alert">*</span></label>
@@ -282,6 +287,7 @@
                                 <option value="1">Lantai 1</option>
                                 <option value="2">Lantai 2</option>
                             </select>
+                        <x-field-error name="floor" />
                         </div>
                     </div>
 
@@ -290,11 +296,13 @@
                             <label class="block text-xs font-semibold text-ink mb-1">Tipe Kamar <span class="text-alert">*</span></label>
                             <input type="text" name="type" x-model="roomForm.type" required placeholder="Contoh: Standard AC" 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="type" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink mb-1">Ukuran Ruangan</label>
                             <input type="text" name="size" x-model="roomForm.size" placeholder="Contoh: 3x4 m" 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="size" />
                         </div>
                     </div>
 
@@ -303,6 +311,7 @@
                             <label class="block text-xs font-semibold text-ink mb-1">Harga Sewa / Bulan (Rp) <span class="text-alert">*</span></label>
                             <input type="number" name="monthly_price" x-model="roomForm.monthly_price" required min="100000" step="25000" 
                                    class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5 tabular-nums">
+                        <x-field-error name="monthly_price" />
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-ink mb-1">Status Kamar <span class="text-alert">*</span></label>
@@ -312,6 +321,7 @@
                                 <option value="terisi">Terisi Penghuni</option>
                                 <option value="perbaikan">Dalam Perbaikan</option>
                             </select>
+                        <x-field-error name="status" />
                         </div>
                     </div>
 
@@ -320,12 +330,14 @@
                         <textarea name="facilities" x-model="roomForm.facilities" required rows="2" 
                                   placeholder="Kasur Springbed, Kamar Mandi Dalam, Lemari Pakaian, Meja Belajar, WiFi Cepat" 
                                   class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5"></textarea>
+                        <x-field-error name="facilities" />
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold text-ink mb-1">Catatan Tambahan (Opsional)</label>
                         <input type="text" name="description" x-model="roomForm.description" placeholder="Dekat dapur bersama / Jendela hadap timur" 
                                class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
+                        <x-field-error name="description" />
                     </div>
 
                     <div class="pt-4 border-t border-line flex items-center justify-end space-x-3">

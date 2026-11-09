@@ -46,7 +46,7 @@
         @foreach($steps as $sIndex => $sLabel)
             <div class="flex-1 flex flex-col gap-1">
                 <div class="h-1.5 rounded-full transition-all duration-300 motion-reduce:transition-none {{ $sIndex < $currentStep ? 'bg-brand' : ($sIndex === $currentStep ? $activeBarClass : 'bg-line') }}"></div>
-                <span class="text-[10px] {{ $sIndex === $currentStep ? 'font-bold text-ink' : ($sIndex < $currentStep ? 'font-medium text-ink-soft' : 'font-normal text-ink-faint') }}">
+                <span class="text-2xs {{ $sIndex === $currentStep ? 'font-bold text-ink' : ($sIndex < $currentStep ? 'font-medium text-ink-soft' : 'font-normal text-ink-faint') }}">
                     {{ $sLabel }}
                 </span>
             </div>

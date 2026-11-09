@@ -1,119 +1,138 @@
 @extends('layouts.app')
 
-@section('page_title', 'Executive Dashboard')
-@section('page_subtitle', 'Monitoring pendapatan sewa, okupansi kamar, pesanan warkop & pengingat belanja stok')
+@section('page_title', 'Ringkasan Kos')
+@section('page_subtitle', 'Kondisi pendapatan, hunian, pesanan, dan stok hari ini')
+@section('no_page_band', '1')
 
 @section('content')
+@php
+    $hour = (int) now()->format('H');
+    $greeting = $hour < 11 ? 'pagi' : ($hour < 15 ? 'siang' : ($hour < 18 ? 'sore' : 'malam'));
+    // Lewati gelar/singkatan berakhiran titik ("H.", "Dr.") saat menyapa
+    $nameParts = array_values(array_filter(explode(' ', trim(Auth::user()->name)), fn ($w) => $w !== '' && !str_ends_with($w, '.')));
+    $firstName = $nameParts[0] ?? 'Pengelola';
+    $attention = [];
+    if ($overdueBills->isNotEmpty()) { $attention[] = $overdueBills->count() . ' tagihan lewat jatuh tempo'; }
+    if ($stockAlerts->isNotEmpty()) { $attention[] = $stockAlerts->count() . ' stok menipis'; }
+    if ($activeOrdersCount > 0) { $attention[] = $activeOrdersCount . ' pesanan sedang berjalan'; }
+    $occ = round(($occupiedRoomsCount / max($roomsCount, 1)) * 100);
+@endphp
 <div class="space-y-6">
 
-    <!-- KPI Metric Cards Grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- Card 1: Total Pendapatan Bulan Berjalan -->
-        <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex flex-col justify-between">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-ink-soft uppercase tracking-wider">Total Pendapatan Bulan Ini</span>
-                <div class="w-9 h-9 rounded-xl bg-brand-wash text-brand flex items-center justify-center flex-shrink-0">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </div>
-            </div>
-            <div class="mt-3">
-                <div class="text-2xl font-extrabold text-ink tabular-nums">
-                    Rp {{ number_format($totalIncomeThisMonth, 0, ',', '.') }}
-                </div>
-                <div class="mt-2 flex items-center justify-between text-xs text-ink-soft pt-2 border-t border-line">
-                    <span>Sewa: <strong class="text-ink tabular-nums">Rp {{ number_format($rentIncomeThisMonth, 0, ',', '.') }}</strong></span>
-                    <span>Warkop: <strong class="text-brand tabular-nums">Rp {{ number_format($serviceSalesThisMonth, 0, ',', '.') }}</strong></span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 2: Okupansi Kamar -->
-        <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex flex-col justify-between">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-ink-soft uppercase tracking-wider">Okupansi Kamar</span>
-                <div class="w-9 h-9 rounded-xl bg-brand-wash text-brand flex items-center justify-center flex-shrink-0">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                    </svg>
-                </div>
-            </div>
-            <div class="mt-3">
-                <div class="flex items-baseline space-x-2">
-                    <span class="text-2xl font-extrabold text-ink tabular-nums">{{ $occupiedRoomsCount }} / {{ $roomsCount }}</span>
-                    <span class="text-xs font-bold text-brand tabular-nums">
-                        {{ round(($occupiedRoomsCount / max($roomsCount, 1)) * 100) }}% Terisi
-                    </span>
-                </div>
-                <div class="mt-2 flex items-center justify-between text-xs text-ink-soft pt-2 border-t border-line">
-                    <span>Tersedia: <strong class="text-ink tabular-nums">{{ $availableRoomsCount }}</strong></span>
-                    <span>Perbaikan: <strong class="text-ink tabular-nums">{{ $repairRoomsCount }}</strong></span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 3: Penghuni Aktif -->
-        <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex flex-col justify-between">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-ink-soft uppercase tracking-wider">Penghuni Aktif</span>
-                <div class="w-9 h-9 rounded-xl bg-brand-wash text-brand flex items-center justify-center flex-shrink-0">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                    </svg>
-                </div>
-            </div>
-            <div class="mt-3">
-                <div class="flex items-baseline space-x-2">
-                    <span class="text-2xl font-extrabold text-ink tabular-nums">{{ $tenantsCount }}</span>
-                    <span class="text-xs font-medium text-ink-soft">Orang</span>
-                </div>
-                <div class="mt-2 flex items-center justify-between text-xs text-ink-soft pt-2 border-t border-line">
-                    <span>Terdata Lengkap</span>
-                    <a href="{{ route('pengelola.penghuni.index') }}" class="text-brand hover:text-brand-deep font-semibold">Kelola &rarr;</a>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 4: Tagihan Belum Lunas -->
-        <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex flex-col justify-between">
-            <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-ink-soft uppercase tracking-wider">Tagihan Tertunda</span>
-                <div class="w-9 h-9 rounded-xl bg-brand-wash text-brand flex items-center justify-center flex-shrink-0">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </div>
-            </div>
-            <div class="mt-3">
-                <div class="text-2xl font-extrabold text-alert tabular-nums">
-                    Rp {{ number_format($pendingRentThisMonth, 0, ',', '.') }}
-                </div>
-                <div class="mt-2 flex items-center justify-between text-xs text-ink-soft pt-2 border-t border-line">
-                    <span class="text-alert font-semibold">{{ $overdueBills->count() }} Menunggak / Menunggu</span>
-                    <a href="{{ route('pengelola.tagihan.index') }}" class="text-brand hover:text-brand-deep font-semibold">Lihat &rarr;</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Alert Banner: Tagihan Menunggak (Jika Ada) -->
-    @if($overdueBills->isNotEmpty())
-        <div class="p-4 bg-surface border border-line border-l-4 border-l-alert rounded-2xl flex items-start space-x-3 shadow-xs">
-            <svg class="w-5 h-5 text-alert flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-            </svg>
-            <div class="flex-1">
-                <h4 class="text-xs font-bold text-ink">Perhatian: Ada {{ $overdueBills->count() }} Tagihan Sewa Melewati Jatuh Tempo</h4>
-                <p class="text-xs text-ink-soft mt-0.5">
-                    Kamar yang belum melunasi: 
-                    @foreach($overdueBills as $ob)
-                        <span class="font-semibold text-ink">{{ $ob->room->room_number }} ({{ $ob->tenantProfile->user->name ?? 'Penghuni' }})</span>{{ !$loop->last ? ', ' : '' }}
-                    @endforeach
+    <!-- Sapaan + tindakan cepat -->
+    <section aria-labelledby="greet" class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand to-brand-deep text-surface p-5 sm:p-7 shadow-md">
+        <div class="absolute -right-10 -top-10 w-48 h-48 rounded-full bg-ochre/25 blur-2xl" aria-hidden="true"></div>
+        <div class="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+            <div>
+                <p class="text-sm font-medium text-surface/90">{{ now()->translatedFormat('l, d F Y') }}</p>
+                <h1 id="greet" class="mt-1 text-2xl sm:text-3xl font-bold tracking-tight">Selamat {{ $greeting }}, {{ $firstName }}</h1>
+                <p class="mt-2 text-sm sm:text-base text-surface/90 max-w-xl">
+                    @if(count($attention))
+                        Hari ini perlu perhatian: {{ implode(', ', $attention) }}.
+                    @else
+                        Semua beres. Tidak ada tagihan tertunda maupun stok yang menipis.
+                    @endif
                 </p>
             </div>
-            <a href="{{ route('pengelola.tagihan.index') }}" class="text-xs font-bold text-surface bg-brand hover:bg-brand-deep px-3 py-1.5 rounded-xl transition-colors flex-shrink-0">
-                Tinjau Tagihan
+            <div class="grid grid-cols-1 sm:flex sm:flex-wrap gap-2.5">
+                <a href="{{ route('pengelola.tagihan.index') }}" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-surface text-brand-deep text-sm font-semibold shadow-sm hover:bg-brand-wash transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Cek tagihan
+                </a>
+                <a href="{{ route('pengelola.penghuni.index') }}" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-surface/15 text-surface text-sm font-semibold ring-1 ring-inset ring-surface/40 hover:bg-surface/25 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    Daftarkan penghuni
+                </a>
+                <a href="{{ route('pengelola.prediksi.index') }}" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-surface/15 text-surface text-sm font-semibold ring-1 ring-inset ring-surface/40 hover:bg-surface/25 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                    Rencana belanja
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- KPI: 2 kolom di ponsel, 4 kolom di layar lebar -->
+    <section aria-label="Ringkasan angka penting" class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div class="stat-card p-4 sm:p-5" data-tone="brand">
+            <div class="flex items-start justify-between gap-2">
+                <span class="text-2xs sm:text-xs font-bold text-ink-soft uppercase tracking-wide">Pendapatan bulan ini</span>
+                <span class="hidden sm:flex w-9 h-9 rounded-xl bg-brand-wash text-brand items-center justify-center shrink-0" aria-hidden="true">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </span>
+            </div>
+            <p class="mt-2 text-xl sm:text-3xl font-extrabold text-ink tabular-nums">Rp {{ number_format($totalIncomeThisMonth, 0, ',', '.') }}</p>
+            <dl class="mt-3 pt-3 border-t border-line text-xs text-ink-soft space-y-1">
+                <div class="flex justify-between gap-2"><dt>Sewa</dt><dd class="font-semibold text-ink tabular-nums">Rp {{ number_format($rentIncomeThisMonth, 0, ',', '.') }}</dd></div>
+                <div class="flex justify-between gap-2"><dt>Warkop &amp; galon</dt><dd class="font-semibold text-ochre-ink tabular-nums">Rp {{ number_format($serviceSalesThisMonth, 0, ',', '.') }}</dd></div>
+            </dl>
+        </div>
+
+        <div class="stat-card p-4 sm:p-5" data-tone="process">
+            <div class="flex items-start justify-between gap-2">
+                <span class="text-2xs sm:text-xs font-bold text-ink-soft uppercase tracking-wide">Okupansi kamar</span>
+                <span class="hidden sm:flex w-9 h-9 rounded-xl bg-process-wash text-process items-center justify-center shrink-0" aria-hidden="true">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                </span>
+            </div>
+            <p class="mt-2 text-xl sm:text-3xl font-extrabold text-ink tabular-nums">{{ $occupiedRoomsCount }}<span class="text-ink-faint font-bold"> / {{ $roomsCount }}</span></p>
+            <div class="mt-2 h-2 rounded-full bg-process-wash overflow-hidden" role="progressbar" aria-valuenow="{{ $occ }}" aria-valuemin="0" aria-valuemax="100" aria-label="Kamar terisi">
+                <div class="h-full rounded-full bg-process" style="width: {{ $occ }}%"></div>
+            </div>
+            <dl class="mt-3 pt-3 border-t border-line text-xs text-ink-soft space-y-1">
+                <div class="flex justify-between gap-2"><dt>Terisi</dt><dd class="font-semibold text-ink tabular-nums">{{ $occ }}%</dd></div>
+                <div class="flex justify-between gap-2"><dt>Kosong / perbaikan</dt><dd class="font-semibold text-ink tabular-nums">{{ $availableRoomsCount }} / {{ $repairRoomsCount }}</dd></div>
+            </dl>
+        </div>
+
+        <div class="stat-card p-4 sm:p-5" data-tone="ochre">
+            <div class="flex items-start justify-between gap-2">
+                <span class="text-2xs sm:text-xs font-bold text-ink-soft uppercase tracking-wide">Penghuni aktif</span>
+                <span class="hidden sm:flex w-9 h-9 rounded-xl bg-ochre-wash text-ochre-ink items-center justify-center shrink-0" aria-hidden="true">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                </span>
+            </div>
+            <p class="mt-2 flex items-baseline gap-1.5">
+                <span class="text-xl sm:text-3xl font-extrabold text-ink tabular-nums">{{ $tenantsCount }}</span>
+                <span class="text-sm font-medium text-ink-soft">orang</span>
+            </p>
+            <div class="mt-3 pt-3 border-t border-line text-xs">
+                <a href="{{ route('pengelola.penghuni.index') }}" class="inline-flex items-center gap-1 font-semibold text-brand hover:text-brand-deep underline-offset-2 hover:underline py-1">Kelola penghuni <span aria-hidden="true">&rarr;</span></a>
+            </div>
+        </div>
+
+        <div class="stat-card p-4 sm:p-5" data-tone="{{ $pendingRentThisMonth > 0 ? 'alert' : 'done' }}">
+            <div class="flex items-start justify-between gap-2">
+                <span class="text-2xs sm:text-xs font-bold text-ink-soft uppercase tracking-wide">Tagihan tertunda</span>
+                <span class="hidden sm:flex w-9 h-9 rounded-xl {{ $pendingRentThisMonth > 0 ? 'bg-alert-wash text-alert' : 'bg-done-wash text-done' }} items-center justify-center shrink-0" aria-hidden="true">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </span>
+            </div>
+            <p class="mt-2 text-xl sm:text-3xl font-extrabold tabular-nums {{ $pendingRentThisMonth > 0 ? 'text-alert' : 'text-done' }}">Rp {{ number_format($pendingRentThisMonth, 0, ',', '.') }}</p>
+            <div class="mt-3 pt-3 border-t border-line text-xs flex flex-wrap items-center justify-between gap-x-2">
+                <span class="font-semibold {{ $overdueBills->count() ? 'text-alert' : 'text-done' }}">{{ $overdueBills->count() ? $overdueBills->count() . ' perlu ditagih' : 'Semua lancar' }}</span>
+                <a href="{{ route('pengelola.tagihan.index') }}" class="font-semibold text-brand hover:text-brand-deep underline-offset-2 hover:underline py-1">Lihat <span aria-hidden="true">&rarr;</span></a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Peringatan tagihan menunggak -->
+    @if($overdueBills->isNotEmpty())
+        <div role="alert" class="p-4 sm:p-5 bg-alert-wash border border-alert/30 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            <div class="flex items-start gap-3 flex-1 min-w-0">
+                <svg class="w-6 h-6 text-alert shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                <div class="min-w-0">
+                    <h3 class="text-sm font-bold text-ink">{{ $overdueBills->count() }} tagihan sewa melewati jatuh tempo</h3>
+                    <p class="text-sm text-ink-soft mt-0.5">
+                        @foreach($overdueBills as $ob)
+                            <span class="font-semibold text-ink whitespace-nowrap">{{ $ob->room->room_number }} ({{ $ob->tenantProfile->user->name ?? 'Penghuni' }})</span>{{ !$loop->last ? ', ' : '' }}
+                        @endforeach
+                    </p>
+                </div>
+            </div>
+            <a href="{{ route('pengelola.tagihan.index') }}" class="inline-flex justify-center items-center text-sm font-bold text-surface bg-alert hover:bg-alert/90 px-4 py-2.5 rounded-xl transition-colors shrink-0">
+                Tinjau tagihan
             </a>
         </div>
     @endif
@@ -138,7 +157,7 @@
         </div>
 
         <div class="mt-4 relative h-72 w-full">
-            <canvas id="revenueTrendChart"></canvas>
+            <canvas id="revenueTrendChart" role="img" aria-label="Grafik batang pendapatan sewa kamar dan penjualan warkop selama enam bulan terakhir"></canvas>
         </div>
     </div>
 
@@ -183,7 +202,7 @@
                                 <p class="text-xs text-ink-soft mt-0.5">
                                     {{ $order->items->pluck('item_name')->join(', ') }}
                                 </p>
-                                <span class="text-[11px] text-ink-faint mt-1 block">
+                                <span class="text-2xs text-ink-faint mt-1 block">
                                     {{ $order->created_at->diffForHumans() }} &bull; {{ $order->payment_method }}
                                 </span>
                             </div>
@@ -270,7 +289,7 @@
                         <div class="p-3 rounded-xl bg-canvas border border-line">
                             <div class="flex items-center justify-between gap-2">
                                 <span class="text-xs font-bold text-ink truncate">{{ $pred->catalogItem->name ?? 'Item' }}</span>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 {{ $pred->status === 'kritis' ? 'bg-alert-wash text-alert border border-alert/20' : 'bg-wait-wash text-wait border border-wait/20' }}">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold shrink-0 {{ $pred->status === 'kritis' ? 'bg-alert-wash text-alert border border-alert/20' : 'bg-wait-wash text-wait border border-wait/20' }}">
                                     {{ $pred->status === 'kritis' ? 'Segera Beli' : 'Perlu Ditambah' }}
                                 </span>
                             </div>
@@ -288,7 +307,7 @@
                     @empty
                         <div class="p-4 text-center text-xs text-ink-faint space-y-1">
                             <p class="font-bold text-done">Persediaan Kos Masih Aman</p>
-                            <p class="text-[11px]">Seluruh stok warkop dan galon mencukupi untuk 7 hari ke depan.</p>
+                            <p class="text-2xs">Seluruh stok warkop dan galon mencukupi untuk 7 hari ke depan.</p>
                         </div>
                     @endforelse
                 </div>
@@ -322,6 +341,7 @@
 @endsection
 
 @push('scripts')
+@include('layouts.partials.charts-script')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const ctx = document.getElementById('revenueTrendChart');
@@ -386,15 +406,21 @@ document.addEventListener('DOMContentLoaded', function () {
                     ticks: {
                         font: {
                             family: "'Plus Jakarta Sans', sans-serif",
-                            size: 11
+                            size: 12
                         },
-                        color: '#55645f'
+                        color: '#46544f',
+                        maxRotation: 0,
+                        autoSkip: true,
+                        callback: function (value) {
+                            const label = this.getLabelForValue(value);
+                            return window.innerWidth < 640 ? String(label).split(' ')[0] : label;
+                        }
                     }
                 },
                 y: {
                     beginAtZero: true,
                     grid: {
-                        color: '#dbe1dc',
+                        color: '#dedbd0',
                         lineWidth: 1
                     },
                     ticks: {
@@ -402,12 +428,13 @@ document.addEventListener('DOMContentLoaded', function () {
                             family: "'Plus Jakarta Sans', sans-serif",
                             size: 11
                         },
-                        color: '#55645f',
+                        color: '#46544f',
+                        maxTicksLimit: 5,
                         callback: function (value) {
                             if (value >= 1000000) {
-                                return 'Rp ' + (value / 1000000).toFixed(1) + ' jt';
+                                return (value / 1000000).toFixed(value % 1000000 ? 1 : 0) + ' jt';
                             }
-                            return 'Rp ' + (value / 1000).toFixed(0) + ' rb';
+                            return (value / 1000).toFixed(0) + ' rb';
                         }
                     }
                 }

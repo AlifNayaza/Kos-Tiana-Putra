@@ -3,13 +3,45 @@
 @section('content')
 <div x-data="{
     activeCategory: 'semua',
-    searchQuery: '{{ $search ?? '' }}',
+    searchQuery: @js($search ?? ''),
+    catalog: @js($catalogMap),
     cart: {},
     checkoutOpen: false,
     detailOpen: false,
     detailItem: null,
     paymentMethod: 'Tunai / Bayar di Kamar',
     orderNotes: '',
+
+    // Keranjang disimpan di perangkat agar tidak hilang saat halaman dimuat ulang atau tertutup.
+    cartKey: 'kos-cart-{{ Auth::id() }}',
+    cartRestored: 0,
+
+    init() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(this.cartKey) || '[]');
+            saved.forEach(s => {
+                const it = this.catalog[s.id];
+                if (!it || it.stock <= 0) return;
+                this.cart[s.id] = {
+                    id: Number(s.id), name: it.name, price: it.price,
+                    quantity: Math.min(Number(s.quantity) || 1, it.stock),
+                    maxStock: it.stock, category: it.category
+                };
+            });
+            this.cartRestored = Object.keys(this.cart).length;
+        } catch (e) {}
+        this.$watch('cart', () => {
+            try {
+                localStorage.setItem(this.cartKey, JSON.stringify(this.cartItems.map(i => ({ id: i.id, quantity: i.quantity }))));
+            } catch (e) {}
+        }, { deep: true });
+    },
+
+    clearCart() {
+        this.cart = {};
+        this.cartRestored = 0;
+        this.checkoutOpen = false;
+    },
 
     openDetail(item) {
         this.detailItem = item;
@@ -81,8 +113,8 @@
     <div class="space-y-3">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-                <h1 class="text-base sm:text-lg font-bold text-ink">Pesan Menu</h1>
-                <p class="text-xs text-ink-soft">Makanan, minuman, dan galon diantar langsung ke {{ $roomNumber }}</p>
+                <h1 class="text-3xl text-brand-deep">Pesan Menu</h1>
+                <p class="text-sm text-ink-soft mt-0.5">Makanan, minuman, dan galon diantar langsung ke {{ $roomNumber }}</p>
             </div>
 
             <!-- Search Input -->
@@ -111,25 +143,25 @@
         <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
             <button type="button" 
                     @click="activeCategory = 'semua'"
-                    :class="activeCategory === 'semua' ? 'bg-brand-wash text-brand font-bold border border-line' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
+                    :class="activeCategory === 'semua' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
                     class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
                 Semua ({{ $counts['semua'] ?? $items->count() }})
             </button>
             <button type="button" 
                     @click="activeCategory = 'makanan'"
-                    :class="activeCategory === 'makanan' ? 'bg-brand-wash text-brand font-bold border border-line' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
+                    :class="activeCategory === 'makanan' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
                     class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
                 Makanan ({{ $counts['makanan'] ?? 0 }})
             </button>
             <button type="button" 
                     @click="activeCategory = 'minuman'"
-                    :class="activeCategory === 'minuman' ? 'bg-brand-wash text-brand font-bold border border-line' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
+                    :class="activeCategory === 'minuman' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
                     class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
                 Minuman ({{ $counts['minuman'] ?? 0 }})
             </button>
             <button type="button" 
                     @click="activeCategory = 'galon'"
-                    :class="activeCategory === 'galon' ? 'bg-brand-wash text-brand font-bold border border-line' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
+                    :class="activeCategory === 'galon' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
                     class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
                 Galon ({{ $counts['galon'] ?? 0 }})
             </button>
@@ -158,10 +190,10 @@
                     <div x-show="activeCategory === 'semua' || activeCategory === '{{ $catKey }}'" class="space-y-2.5">
                         <!-- Sticky Category Header -->
                         <div class="sticky top-14 sm:top-16 z-20 bg-canvas/95 backdrop-blur-xs py-2 px-1 border-b border-line flex items-center justify-between">
-                            <h2 class="text-xs font-bold text-ink-soft uppercase tracking-wider">
+                            <h2 class="section-title text-lg text-ink">
                                 {{ $catLabel }}
                             </h2>
-                            <span class="text-[11px] text-ink-faint font-medium">
+                            <span class="text-xs text-ink-soft font-semibold">
                                 {{ $catItems->count() }} item
                             </span>
                         </div>
@@ -170,7 +202,16 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                             @foreach($catItems as $item)
                                 <div x-show="matchesFilter('{{ $item->category }}', '{{ addslashes($item->name) }}')"
-                                     class="bg-surface rounded-xl border border-line p-3 sm:p-3.5 flex items-center justify-between gap-3 shadow-xs hover:border-ink-faint transition-colors">
+                                     class="bg-surface rounded-2xl border border-line p-3 sm:p-3.5 flex items-center gap-3 shadow-sm hover:shadow-md hover:border-brand/40 transition-all">
+                                    <span class="cat-tile" data-cat="{{ $item->category }}" aria-hidden="true">
+                                        @if($item->category === 'minuman')
+                                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 4h10l-1.2 15.2a1 1 0 01-1 .8H9.2a1 1 0 01-1-.8L7 4zM7.6 10h8.8"/></svg>
+                                        @elseif($item->category === 'galon')
+                                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3.5c-3 4-5 6.5-5 9a5 5 0 0010 0c0-2.5-2-5-5-9z"/></svg>
+                                        @else
+                                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 12h16a8 8 0 01-16 0zM8 8c0-1.5 1-1.5 1-3M12 8c0-1.5 1-1.5 1-3M16 8c0-1.5 1-1.5 1-3"/></svg>
+                                        @endif
+                                    </span>
                                     <div class="flex-1 min-w-0 pr-1 cursor-pointer group active:opacity-75 transition-opacity"
                                          @click="openDetail({
                                              id: {{ $item->id }},
@@ -184,29 +225,29 @@
                                              description: '{{ addslashes($item->description ?? '') }}'
                                          })">
                                         <div class="flex items-center gap-1.5">
-                                            <h3 class="text-xs sm:text-sm font-bold text-ink group-hover:text-brand transition-colors leading-snug line-clamp-1 sm:line-clamp-none">
+                                            <h3 class="text-sm sm:text-base font-bold text-ink group-hover:text-brand transition-colors leading-snug line-clamp-2">
                                                 {{ $item->name }}
                                             </h3>
                                         </div>
 
                                         @if($item->description)
-                                            <p class="text-[11px] text-ink-soft leading-normal mt-0.5 line-clamp-1 sm:line-clamp-2 lg:line-clamp-none" title="{{ $item->description }}">
+                                            <p class="text-2xs text-ink-soft leading-normal mt-0.5 line-clamp-1 sm:line-clamp-2 lg:line-clamp-none" title="{{ $item->description }}">
                                                 {{ $item->description }}
                                             </p>
                                         @endif
 
                                         <div class="flex items-center gap-2 mt-1.5 sm:mt-2">
-                                            <span class="text-xs font-semibold text-ink whitespace-nowrap tabular-nums">
+                                            <span class="text-sm font-extrabold text-brand whitespace-nowrap tabular-nums">
                                                 {{ $item->formatted_price }}
                                             </span>
 
                                             <!-- Sembunyikan angka stok: sisa sedikit jika <= min_stock, habis jika 0 -->
                                             @if($item->stock <= 0)
-                                                <span class="text-[10px] font-semibold text-alert">
+                                                <span class="text-2xs font-semibold text-alert">
                                                     Habis
                                                 </span>
                                             @elseif($item->stock <= $item->minimum_stock)
-                                                <span class="text-[10px] font-semibold text-wait">
+                                                <span class="text-2xs font-semibold text-wait">
                                                     Sisa sedikit
                                                 </span>
                                             @endif
@@ -300,7 +341,7 @@
                             <div class="py-2 flex items-center justify-between gap-2">
                                 <div class="flex-1 min-w-0">
                                     <p class="font-semibold text-ink truncate" x-text="item.name"></p>
-                                    <p class="text-[11px] text-ink-faint tabular-nums" 
+                                    <p class="text-2xs text-ink-faint tabular-nums" 
                                        x-text="'Rp ' + item.price.toLocaleString('id-ID') + ' × ' + item.quantity"></p>
                                 </div>
                                 <div class="flex items-center gap-1.5 flex-shrink-0">
@@ -349,6 +390,9 @@
             <div>
                 <span class="text-xs font-bold text-ink block" x-text="cartCount + ' item dipilih'"></span>
                 <span class="text-sm font-bold text-brand tabular-nums whitespace-nowrap" x-text="cartFormattedTotal"></span>
+                <button type="button" @click="clearCart()" class="block text-2xs font-semibold text-ink-soft underline underline-offset-2 hover:text-alert min-h-0 !min-h-0 py-0.5">
+                    <span x-show="cartRestored > 0">Keranjang dipulihkan &middot; </span>Kosongkan
+                </button>
             </div>
             <button type="button" 
                     @click="checkoutOpen = true"
@@ -372,7 +416,7 @@
                     <div class="flex items-center justify-between text-xs py-1">
                         <div class="pr-2">
                             <span class="font-medium text-ink" x-text="item.name"></span>
-                            <span class="text-ink-faint tabular-nums text-[11px]" 
+                            <span class="text-ink-faint tabular-nums text-2xs" 
                                   x-text="' × ' + item.quantity"></span>
                         </div>
                         <span class="font-semibold text-ink tabular-nums whitespace-nowrap" 
@@ -437,15 +481,15 @@
             <div class="space-y-4">
                 <div>
                     <div class="flex items-center gap-2 mb-1.5">
-                        <span class="text-[10px] font-bold text-brand bg-brand-wash px-2.5 py-0.5 rounded-full border border-line uppercase tracking-wider" 
+                        <span class="text-2xs font-bold text-brand bg-brand-wash px-2.5 py-0.5 rounded-full border border-line uppercase tracking-wider" 
                               x-text="detailItem.category"></span>
                         
                         <span x-show="detailItem.stock <= 0" 
-                              class="text-[10px] font-semibold text-alert">
+                              class="text-2xs font-semibold text-alert">
                             Stok Habis
                         </span>
                         <span x-show="detailItem.stock > 0 && detailItem.stock <= detailItem.minimum_stock" 
-                              class="text-[10px] font-semibold text-wait">
+                              class="text-2xs font-semibold text-wait">
                             Sisa Sedikit
                         </span>
                     </div>
@@ -461,7 +505,7 @@
                     <p x-text="detailItem.description || 'Tidak ada deskripsi detail untuk menu ini.'"></p>
                 </div>
 
-                <div class="pt-1 text-[11px] text-ink-faint">
+                <div class="pt-1 text-2xs text-ink-faint">
                     Satuan: <span class="font-medium text-ink-soft" x-text="'1 ' + detailItem.unit"></span>
                 </div>
 

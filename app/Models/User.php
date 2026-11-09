@@ -19,6 +19,7 @@ class User extends Authenticatable
         'role',
         'avatar',
         'password',
+        'must_change_password',
     ];
 
     protected $hidden = [
@@ -31,7 +32,21 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'must_change_password' => 'boolean',
         ];
+    }
+
+    /**
+     * Penghuni hanya boleh memakai aplikasi selama profil huniannya aktif
+     * (setelah checkout akun otomatis tidak bisa dipakai lagi).
+     */
+    public function canAccessApp(): bool
+    {
+        if ($this->role !== 'penghuni') {
+            return true;
+        }
+
+        return (bool) $this->tenantProfile?->is_active;
     }
 
     public function isPengelola(): bool

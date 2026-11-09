@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Pengelola;
 
 use App\Http\Controllers\Controller;
-use App\Models\AppNotification;
 use App\Models\RentBill;
-use App\Models\TenantProfile;
+use App\Services\NotificationService;
+use App\Services\RentBillService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,26 +13,32 @@ use Illuminate\Support\Facades\DB;
 
 class RentManagementController extends Controller
 {
+    public function __construct(
+        private RentBillService $bills,
+        private NotificationService $notifier,
+    ) {
+    }
+
     /**
      * Tampilkan daftar tagihan sewa kos dengan filter bulan & status (FR-04).
      */
     public function index(Request $request)
     {
-        $currentMonth = Carbon::now()->month;
-        $currentYear = Carbon::now()->year;
-
-        $monthFilter = $request->query('month', $currentMonth);
-        $yearFilter = $request->query('year', $currentYear);
+        $monthFilter = $request->query('month', Carbon::now()->month);
+        $yearFilter = $request->query('year', Carbon::now()->year);
         $statusFilter = $request->query('status', 'semua');
         $search = $request->query('q');
 
+        $monthSelected = $monthFilter && $monthFilter !== 'semua';
+        $yearSelected = $yearFilter && $yearFilter !== 'semua';
+
         $query = RentBill::with(['tenantProfile.user', 'room', 'confirmer']);
 
-        if ($monthFilter && $monthFilter !== 'semua') {
+        if ($monthSelected) {
             $query->where('month', (int) $monthFilter);
         }
 
-        if ($yearFilter && $yearFilter !== 'semua') {
+        if ($yearSelected) {
             $query->where('year', (int) $yearFilter);
         }
 
@@ -52,14 +58,22 @@ class RentManagementController extends Controller
             });
         }
 
-        $bills = $query->latest('due_date')->paginate(15);
+        $bills = $query->latest('due_date')->paginate(15)->withQueryString();
 
-        // Ringkasan Finansial Tagihan
+        // Ringkasan finansial mengikuti filter periode ("semua" = tanpa batasan)
+        $periodQuery = fn () => RentBill::query()
+            ->when($monthSelected, fn ($q) => $q->where('month', (int) $monthFilter))
+            ->when($yearSelected, fn ($q) => $q->where('year', (int) $yearFilter));
+
+        $period = $periodQuery()
+            ->selectRaw("COUNT(*) as total, COALESCE(SUM(CASE WHEN status = 'lunas' THEN amount ELSE 0 END), 0) as lunas, COALESCE(SUM(CASE WHEN status IN ('menunggu','menunggak') THEN amount ELSE 0 END), 0) as open_amount")
+            ->first();
+
         $stats = [
-            'total_bills'   => RentBill::where('year', $yearFilter)->where('month', $monthFilter)->count(),
-            'lunas_sum'     => RentBill::where('year', $yearFilter)->where('month', $monthFilter)->where('status', 'lunas')->sum('amount'),
-            'menunggu_sum'  => RentBill::where('year', $yearFilter)->where('month', $monthFilter)->whereIn('status', ['menunggu', 'menunggak'])->sum('amount'),
-            'need_verify'   => RentBill::where('status', 'menunggu')->whereNotNull('payment_proof')->count(),
+            'total_bills'  => (int) $period->total,
+            'lunas_sum'    => (int) $period->lunas,
+            'menunggu_sum' => (int) $period->open_amount,
+            'need_verify'  => RentBill::where('status', 'menunggu')->whereNotNull('payment_proof')->count(),
         ];
 
         return view('pengelola.tagihan.index', compact('bills', 'stats', 'monthFilter', 'yearFilter', 'statusFilter', 'search'));
@@ -72,24 +86,39 @@ class RentManagementController extends Controller
     {
         $pengelola = Auth::user();
 
-        $bill->update([
-            'status'         => 'lunas',
-            'payment_date'   => $bill->payment_date ?: now(),
-            'payment_method' => $bill->payment_method ?: 'Transfer Bank / Tunai Terverifikasi',
-            'confirmed_by'   => $pengelola->id,
-            'notes'          => 'Lunas diverifikasi oleh ' . $pengelola->name . ' pada ' . now()->format('d/m/Y H:i'),
-        ]);
+        $confirmed = DB::transaction(function () use ($bill, $pengelola) {
+            $fresh = RentBill::whereKey($bill->id)->lockForUpdate()->firstOrFail();
 
-        // Kirim notifikasi ke penghuni
-        if ($bill->tenantProfile && $bill->tenantProfile->user_id) {
-            AppNotification::create([
-                'user_id'    => $bill->tenantProfile->user_id,
-                'title'      => 'Pembayaran Sewa Terverifikasi Lunas!',
-                'message'    => "Tagihan sewa bulan {$bill->period_label} ({$bill->formatted_amount}) telah berhasil diverifikasi oleh {$pengelola->name}.",
-                'type'       => 'rent',
-                'action_url' => route('penghuni.tagihan'),
-                'is_read'    => false,
+            if ($fresh->status === 'lunas') {
+                return false;
+            }
+
+            $stamp = 'Lunas diverifikasi oleh ' . $pengelola->name . ' pada ' . now()->format('d/m/Y H:i');
+
+            $fresh->update([
+                'status'         => 'lunas',
+                'payment_date'   => $fresh->payment_date ?: now(),
+                'payment_method' => $fresh->payment_method ?: 'Transfer Bank / Tunai Terverifikasi',
+                'confirmed_by'   => $pengelola->id,
+                // Catatan penghuni dipertahankan, jejak verifikasi ditambahkan.
+                'notes'          => trim(($fresh->notes ? $fresh->notes . ' • ' : '') . $stamp),
             ]);
+
+            if ($fresh->tenantProfile?->user_id) {
+                $this->notifier->notify(
+                    $fresh->tenantProfile->user_id,
+                    'Pembayaran Sewa Terverifikasi Lunas!',
+                    "Tagihan sewa bulan {$fresh->period_label} ({$fresh->formatted_amount}) telah berhasil diverifikasi oleh {$pengelola->name}.",
+                    'rent',
+                    route('penghuni.tagihan'),
+                );
+            }
+
+            return true;
+        });
+
+        if (!$confirmed) {
+            return redirect()->back()->with('info', "Tagihan {$bill->bill_code} sudah berstatus Lunas sebelumnya.");
         }
 
         return redirect()->back()
@@ -98,20 +127,13 @@ class RentManagementController extends Controller
 
     /**
      * Tandai tagihan menjadi status Menunggak jika telah melewati jatuh tempo.
+     * Tagihan yang sudah lunas tidak dapat diturunkan statusnya.
      */
     public function markOverdue(RentBill $bill)
     {
-        $bill->update(['status' => 'menunggak']);
-
-        if ($bill->tenantProfile && $bill->tenantProfile->user_id) {
-            AppNotification::create([
-                'user_id'    => $bill->tenantProfile->user_id,
-                'title'      => 'Peringatan Tagihan Menunggak',
-                'message'    => "Tagihan sewa bulan {$bill->period_label} telah melewati jatuh tempo. Mohon segera melunasi pembayaran.",
-                'type'       => 'rent',
-                'action_url' => route('penghuni.tagihan'),
-                'is_read'    => false,
-            ]);
+        if (!$this->bills->markOverdue($bill)) {
+            return redirect()->back()
+                ->with('info', "Tagihan {$bill->bill_code} tidak diubah: hanya tagihan berstatus Menunggu yang dapat ditandai Menunggak.");
         }
 
         return redirect()->back()
@@ -119,65 +141,20 @@ class RentManagementController extends Controller
     }
 
     /**
-     * Generate tagihan sewa massal 1-Klik untuk seluruh penghuni aktif pada bulan berjalan.
+     * Generate tagihan sewa massal 1-Klik untuk seluruh penghuni aktif pada periode terpilih.
      */
     public function generateMonthlyBills(Request $request)
     {
         $request->validate([
             'month'    => ['required', 'integer', 'between:1,12'],
-            'year'     => ['required', 'integer', 'min:2025', 'max:2030'],
+            'year'     => ['required', 'integer', 'min:2025', 'max:2035'],
             'due_date' => ['required', 'date'],
         ]);
 
         $month = (int) $request->input('month');
         $year = (int) $request->input('year');
-        $dueDate = $request->input('due_date');
 
-        $activeTenants = TenantProfile::with('room')
-            ->where('is_active', true)
-            ->whereNotNull('room_id')
-            ->get();
-
-        $generatedCount = 0;
-
-        DB::transaction(function () use ($activeTenants, $month, $year, $dueDate, &$generatedCount) {
-            foreach ($activeTenants as $tenant) {
-                // Cek apakah tagihan untuk bulan & tahun ini sudah pernah dibuat
-                $exists = RentBill::where('tenant_profile_id', $tenant->id)
-                    ->where('year', $year)
-                    ->where('month', $month)
-                    ->exists();
-
-                if (!$exists) {
-                    $cleanRoom = str_replace('Kamar ', '', $tenant->room->room_number);
-                    $billCode = sprintf('TAG-%d%02d-%s', $year, $month, $cleanRoom);
-
-                    $bill = RentBill::create([
-                        'bill_code'         => $billCode,
-                        'tenant_profile_id' => $tenant->id,
-                        'room_id'           => $tenant->room_id,
-                        'month'             => $month,
-                        'year'              => $year,
-                        'amount'            => $tenant->room->monthly_price,
-                        'due_date'          => $dueDate,
-                        'status'            => 'menunggu',
-                        'notes'             => 'Tagihan sewa bulanan otomatis',
-                    ]);
-
-                    // Kirim notifikasi ke penghuni
-                    AppNotification::create([
-                        'user_id'    => $tenant->user_id,
-                        'title'      => "Tagihan Sewa Bulan {$bill->period_label} Terbit",
-                        'message'    => "Tagihan sewa kamar Anda sebesar {$bill->formatted_amount} telah terbit. Jatuh tempo: " . Carbon::parse($dueDate)->format('d M Y') . ".",
-                        'type'       => 'rent',
-                        'action_url' => route('penghuni.tagihan'),
-                        'is_read'    => false,
-                    ]);
-
-                    $generatedCount++;
-                }
-            }
-        });
+        $generatedCount = $this->bills->generateForMonth($month, $year, $request->input('due_date'));
 
         return redirect()->route('pengelola.tagihan.index', ['month' => $month, 'year' => $year])
             ->with('success', "Berhasil men-generate {$generatedCount} tagihan sewa baru untuk seluruh penghuni aktif.");
