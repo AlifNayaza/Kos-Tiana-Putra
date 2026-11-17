@@ -200,4 +200,28 @@ class RentBillTest extends TestCase
         $this->assertSame(2, $response->viewData('stats')['total_bills']);
         $this->assertSame(850000, (int) $response->viewData('stats')['lunas_sum']);
     }
+
+    public function test_overdue_bills_from_previous_months_stay_visible_on_bill_page(): void
+    {
+        $pengelola = $this->makeUser('pengelola');
+        $tenant = $this->makeTenant();
+        $lastMonth = now()->subMonthNoOverflow();
+        $old = $this->makeBill($tenant, [
+            'month' => $lastMonth->month, 'year' => $lastMonth->year,
+            'due_date' => $lastMonth->toDateString(),
+        ]);
+        $this->makeBill($tenant); // bulan ini, belum jatuh tempo
+
+        // Filter bawaan (bulan ini) tetap memberi tahu jumlah tunggakan lintas periode.
+        $default = $this->actingAs($pengelola)->get(route('pengelola.tagihan.index'));
+        $this->assertSame(1, $default->viewData('stats')['overdue_count']);
+        // Kartu "Tertunda / Menunggak" ikut menghitung tunggakan bulan lalu, bukan Rp 0.
+        $this->assertSame(1700000, $default->viewData('stats')['menunggu_sum']);
+        $this->assertSame(850000, $default->viewData('stats')['arrears_other_sum']);
+        $default->assertSee('1 tagihan melewati jatuh tempo');
+
+        // Filter "Lewat jatuh tempo" menampilkan tagihan bulan lalu itu saja.
+        $filtered = $this->get(route('pengelola.tagihan.index', ['month' => 'semua', 'year' => 'semua', 'status' => 'jatuh_tempo']));
+        $this->assertSame([$old->id], $filtered->viewData('bills')->pluck('id')->all());
+    }
 }

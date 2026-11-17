@@ -262,10 +262,10 @@ class PerformanceTest extends TestCase
         $pengelola = $this->makeUser('pengelola');
         $this->actingAs($pengelola);
 
-        foreach (['pengelola.dashboard', 'pengelola.laporan.index', 'pengelola.prediksi.index'] as $route) {
+        foreach (['pengelola.dashboard', 'pengelola.laporan.index'] as $route) {
             $this->assertStringContainsString('charts-', $this->get(route($route))->getContent(), "{$route} harus memuat Chart.js");
         }
-        foreach (['pengelola.kamar.index', 'pengelola.tagihan.index', 'pengelola.katalog.index'] as $route) {
+        foreach (['pengelola.kamar.index', 'pengelola.tagihan.index', 'pengelola.katalog.index', 'pengelola.prediksi.index'] as $route) {
             $this->assertStringNotContainsString('charts-', $this->get(route($route))->getContent(), "{$route} tidak butuh Chart.js");
         }
 

@@ -4,7 +4,7 @@
 @section('page_subtitle', 'Pendaftaran penghuni baru, data kontak darurat, dan alokasi kamar kos')
 
 @section('content')
-<div class="space-y-6" x-data="{ 
+<div class="space-y-6" @if(request()->boolean('baru')) x-init="$nextTick(() => { createModalOpen = true })" @endif x-data="{
     createModalOpen: false,
     editModalOpen: false,
     editUrl: '',

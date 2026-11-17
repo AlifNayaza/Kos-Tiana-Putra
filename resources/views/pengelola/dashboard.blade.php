@@ -11,332 +11,305 @@
     // Lewati gelar/singkatan berakhiran titik ("H.", "Dr.") saat menyapa
     $nameParts = array_values(array_filter(explode(' ', trim(Auth::user()->name)), fn ($w) => $w !== '' && !str_ends_with($w, '.')));
     $firstName = $nameParts[0] ?? 'Pengelola';
-    $attention = [];
-    if ($overdueBills->isNotEmpty()) { $attention[] = $overdueBills->count() . ' tagihan lewat jatuh tempo'; }
-    if ($stockAlerts->isNotEmpty()) { $attention[] = $stockAlerts->count() . ' stok menipis'; }
-    if ($activeOrdersCount > 0) { $attention[] = $activeOrdersCount . ' pesanan sedang berjalan'; }
+    $monthName = now()->translatedFormat('F');
+    $rp = fn ($v) => 'Rp ' . number_format((int) $v, 0, ',', '.');
+    $short = fn ($roomNumber) => trim(str_replace('Kamar', '', $roomNumber));
+
+    $overdueOther = $overdueBills->reject(fn ($b) => $b->month === now()->month && $b->year === now()->year);
+    $unpaidTotal = $pendingRentThisMonth + $overdueOther->sum('amount');
+    $overdueRoomIds = $overdueBills->pluck('room_id')->flip();
+    $unbilled = $rooms->filter(fn ($r) => $r->activeTenantProfile && !$currentBills->has($r->id))->count();
     $occ = round(($occupiedRoomsCount / max($roomsCount, 1)) * 100);
+
+    // Daftar "Perlu ditindak": setiap baris punya satu tombol yang langsung membawa ke tempat kerjanya.
+    $agenda = [];
+    if ($overdueBills->isNotEmpty()) {
+        $agenda[] = [
+            'tone' => 'alert', 'icon' => 'M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z',
+            'title' => $overdueBills->count() . ' tagihan lewat jatuh tempo',
+            'detail' => $overdueBills->take(3)->map(fn ($b) => $short($b->room->room_number) . ' ' . (Str::of($b->tenantProfile->user->name ?? '')->before(' ')))->join(', ')
+                . ($overdueBills->count() > 3 ? ' +' . ($overdueBills->count() - 3) : '') . ' · ' . $rp($overdueBills->sum('amount')),
+            'action' => 'Tagih', 'url' => route('pengelola.tagihan.index', ['month' => 'semua', 'year' => 'semua', 'status' => 'jatuh_tempo']),
+        ];
+    }
+    if ($verifyCount > 0) {
+        $agenda[] = [
+            'tone' => 'process', 'icon' => 'M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z',
+            'title' => $verifyCount . ' bukti transfer menunggu dicek',
+            'detail' => 'Cocokkan dengan mutasi rekening, lalu tandai lunas.',
+            'action' => 'Cek bukti', 'url' => route('pengelola.tagihan.index', ['month' => 'semua', 'year' => 'semua', 'status' => 'menunggu']),
+        ];
+    }
+    if ($unbilled > 0) {
+        $agenda[] = [
+            'tone' => 'wait', 'icon' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+            'title' => "Tagihan {$monthName} belum terbit untuk {$unbilled} kamar",
+            'detail' => 'Terbitkan sekaligus untuk semua penghuni aktif.',
+            'action' => 'Terbitkan', 'url' => route('pengelola.tagihan.index', ['baru' => 1]),
+        ];
+    }
+    if ($stockAlerts->isNotEmpty()) {
+        $agenda[] = [
+            'tone' => 'wait', 'icon' => 'M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z',
+            'title' => $stockAlerts->count() . ' barang kios hampir habis',
+            'detail' => $stockAlerts->take(3)->map(fn ($i) => "{$i->name} ({$i->stock})")->join(', ') . ($stockAlerts->count() > 3 ? ' +' . ($stockAlerts->count() - 3) : ''),
+            'action' => 'Rencana belanja', 'url' => route('pengelola.prediksi.index'),
+        ];
+    }
+    $urgent = count($agenda);
+    if ($availableRoomsCount > 0) {
+        $agenda[] = [
+            'tone' => 'brand', 'icon' => 'M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z',
+            'title' => $availableRoomsCount . ' kamar kosong siap diisi',
+            'detail' => $rooms->where('status', 'tersedia')->map(fn ($r) => $short($r->room_number))->join(', '),
+            'action' => 'Daftarkan', 'url' => route('pengelola.penghuni.index', ['baru' => 1]),
+        ];
+    }
+
+    $toneClass = [
+        'alert'   => ['chip' => 'bg-alert-wash text-alert',     'btn' => 'bg-alert text-white hover:bg-alert/90'],
+        'process' => ['chip' => 'bg-process-wash text-process', 'btn' => 'bg-process text-white hover:bg-process/90'],
+        'wait'    => ['chip' => 'bg-wait-wash text-wait',       'btn' => 'bg-surface text-ink border border-line hover:bg-canvas'],
+        'brand'   => ['chip' => 'bg-brand-wash text-brand',     'btn' => 'bg-surface text-ink border border-line hover:bg-canvas'],
+    ];
+
+    // Status pintu di denah
+    $roomState = function ($room) use ($currentBills, $overdueRoomIds) {
+        if ($room->status === 'perbaikan') return 'perbaikan';
+        if (!$room->activeTenantProfile) return 'kosong';
+        if ($overdueRoomIds->has($room->id)) return 'menunggak';
+        $bill = $currentBills->get($room->id);
+        if (!$bill) return 'belum';
+        if ($bill->status === 'lunas') return 'lunas';
+        return $bill->payment_proof ? 'cek' : 'menunggu';
+    };
+    $stateStyle = [
+        'menunggak' => ['label' => 'Menunggak',     'door' => 'border-alert/60 bg-alert-wash',            'pill' => 'bg-alert text-white',        'dot' => 'bg-alert'],
+        'cek'       => ['label' => 'Cek bukti',     'door' => 'border-process/40 bg-process-wash/60',     'pill' => 'bg-process text-white',      'dot' => 'bg-process'],
+        'menunggu'  => ['label' => 'Belum bayar',   'door' => 'border-wait/40 bg-wait-wash/60',           'pill' => 'bg-wait-wash text-wait',     'dot' => 'bg-wait'],
+        'belum'     => ['label' => 'Belum ditagih', 'door' => 'border-line bg-surface',                   'pill' => 'bg-canvas text-ink-soft',    'dot' => 'bg-ink-faint/50'],
+        'lunas'     => ['label' => 'Lunas',         'door' => 'border-done/40 bg-done-wash/50',           'pill' => 'bg-done text-white',         'dot' => 'bg-done'],
+        'kosong'    => ['label' => 'Kosong',        'door' => 'border-dashed border-ink-faint/50 bg-transparent', 'pill' => 'bg-brand-wash text-brand', 'dot' => 'bg-brand/60'],
+        'perbaikan' => ['label' => 'Perbaikan',     'door' => 'border-line room-hatch',                   'pill' => 'bg-ink/80 text-white',       'dot' => 'bg-ink/70'],
+    ];
+    $stateCounts = $rooms->map($roomState)->countBy();
+    $blocks = $rooms->groupBy(fn ($r) => Str::of($short($r->room_number))->substr(0, 1)->upper()->value())->sortKeysDesc();
 @endphp
+
 <div class="space-y-6">
 
-    <!-- Sapaan + tindakan cepat -->
-    <section aria-labelledby="greet" class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand to-brand-deep text-surface p-5 sm:p-7 shadow-md">
-        <div class="absolute -right-10 -top-10 w-48 h-48 rounded-full bg-ochre/25 blur-2xl" aria-hidden="true"></div>
-        <div class="relative flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
-            <div>
-                <p class="text-sm font-medium text-surface/90">{{ now()->translatedFormat('l, d F Y') }}</p>
-                <h1 id="greet" class="mt-1 text-2xl sm:text-3xl font-bold tracking-tight">Selamat {{ $greeting }}, {{ $firstName }}</h1>
-                <p class="mt-2 text-sm sm:text-base text-surface/90 max-w-xl">
-                    @if(count($attention))
-                        Hari ini perlu perhatian: {{ implode(', ', $attention) }}.
-                    @else
-                        Semua beres. Tidak ada tagihan tertunda maupun stok yang menipis.
+    <!-- 1. Sapaan singkat: jumlah hal yang perlu ditindak -->
+    <section class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+        <div>
+            <h1 class="font-display text-[1.75rem] sm:text-4xl font-bold text-brand-deep tracking-tight leading-tight">Selamat {{ $greeting }}, {{ $firstName }}</h1>
+            <p class="mt-1 text-sm text-ink-soft">
+                @if($urgent > 0)
+                    Ada <b class="text-ink">{{ $urgent }} hal</b> yang perlu ditindak hari ini.
+                @else
+                    Semua beres hari ini. Tidak ada tagihan tertunggak maupun stok yang menipis.
+                @endif
+            </p>
+        </div>
+        <p class="text-xs text-ink-faint lg:hidden">{{ now()->translatedFormat('l, d F Y') }}</p>
+    </section>
+
+    <!-- 2. Perlu ditindak + Buku kas -->
+    <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-6 items-start">
+
+        <section aria-labelledby="todo-title" class="bg-surface rounded-3xl border border-line shadow-xs">
+            <div class="px-5 pt-5 pb-3 flex items-center justify-between gap-2">
+                <h2 id="todo-title" class="text-base font-bold text-ink">Perlu ditindak</h2>
+                @if($urgent > 0)
+                    <span class="rounded-md border border-alert/30 bg-alert-wash px-1.5 font-mono text-xs font-bold leading-5 text-alert tabular-nums">{{ $urgent }}</span>
+                @endif
+            </div>
+            <ul class="px-2 pb-2" role="list">
+                @forelse($agenda as $item)
+                    @php $t = $toneClass[$item['tone']]; @endphp
+                    <li class="{{ $loop->index === $urgent && $urgent > 0 ? 'mt-1 pt-1 border-t border-dashed border-line' : '' }}">
+                      <a href="{{ $item['url'] }}" class="group flex items-center gap-3 rounded-2xl px-3 py-3 hover:bg-canvas/70 transition-colors">
+                        <span class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 {{ $t['chip'] }}">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $item['icon'] }}"/></svg>
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-ink leading-snug">{{ $item['title'] }}</p>
+                            <p class="text-xs text-ink-soft line-clamp-2 sm:line-clamp-1">{{ $item['detail'] }}</p>
+                        </div>
+                        <span class="hidden sm:inline-flex shrink-0 items-center gap-1 h-9 px-3 rounded-xl text-xs font-semibold transition-colors {{ $t['btn'] }}">
+                            {{ $item['action'] }}
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                        </span>
+                        <span class="sm:hidden shrink-0 w-8 h-8 rounded-full flex items-center justify-center {{ $t['btn'] }}" aria-hidden="true">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                        </span>
+                        <span class="sr-only">{{ $item['action'] }}</span>
+                      </a>
+                    </li>
+                @empty
+                    <li class="flex items-center gap-3 rounded-2xl px-3 py-4">
+                        <span class="w-10 h-10 rounded-xl bg-done-wash text-done flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                        </span>
+                        <p class="text-sm text-ink-soft"><b class="text-ink">Tidak ada pekerjaan tertunda.</b> Tagihan, stok, dan kamar aman.</p>
+                    </li>
+                @endforelse
+            </ul>
+        </section>
+
+        <!-- Buku kas bulan ini: gaya struk -->
+        <section aria-labelledby="kas-title" class="ledger relative bg-surface rounded-3xl border border-line shadow-xs p-5">
+            <div class="flex items-center justify-between">
+                <h2 id="kas-title" class="text-base font-bold text-ink">Buku kas {{ $monthName }}</h2>
+                <a href="{{ route('pengelola.laporan.index') }}" class="text-xs font-semibold text-brand hover:underline underline-offset-2">Laporan</a>
+            </div>
+            <dl class="mt-4 space-y-2 text-sm">
+                <div class="flex items-baseline gap-2"><dt class="text-ink-soft">Sewa masuk</dt><span class="ledger-dots"></span><dd class="font-mono font-semibold tabular-nums text-ink">{{ $rp($rentIncomeThisMonth) }}</dd></div>
+                <div class="flex items-baseline gap-2"><dt class="text-ink-soft">Kios &amp; galon</dt><span class="ledger-dots"></span><dd class="font-mono font-semibold tabular-nums text-ink">{{ $rp($serviceSalesThisMonth) }}</dd></div>
+            </dl>
+            <div class="my-3 border-t-2 border-dashed border-line"></div>
+            <div class="flex items-baseline justify-between gap-2">
+                <span class="text-sm font-semibold text-ink">Total masuk</span>
+                <span class="font-display text-2xl sm:text-3xl font-bold text-brand-deep tabular-nums">{{ $rp($totalIncomeThisMonth) }}</span>
+            </div>
+            <a href="{{ route('pengelola.tagihan.index', ['month' => 'semua', 'year' => 'semua', 'status' => 'jatuh_tempo']) }}"
+               class="mt-4 flex items-center justify-between gap-2 rounded-2xl px-3.5 py-3 {{ $unpaidTotal > 0 ? 'bg-alert-wash text-alert hover:bg-alert-wash/70' : 'bg-done-wash text-done' }} transition-colors">
+                <span class="text-xs font-semibold leading-snug">
+                    {{ $unpaidTotal > 0 ? 'Belum dibayar' : 'Tidak ada tunggakan' }}
+                    @if($overdueOther->isNotEmpty())
+                        <span class="block font-normal opacity-90">termasuk tunggakan bulan lalu</span>
                     @endif
+                </span>
+                <span class="font-mono text-base font-bold tabular-nums whitespace-nowrap">{{ $rp($unpaidTotal) }}</span>
+            </a>
+        </section>
+    </div>
+
+    <!-- 3. Denah kamar: status setiap pintu sekali lihat -->
+    <section aria-labelledby="denah-title" class="bg-surface rounded-3xl border border-line shadow-xs p-5">
+        <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+            <div>
+                <h2 id="denah-title" class="text-base font-bold text-ink">Denah kamar</h2>
+                <p class="text-xs text-ink-soft mt-0.5">
+                    <b class="text-ink tabular-nums">{{ $occupiedRoomsCount }}/{{ $roomsCount }}</b> terisi ({{ $occ }}%) · {{ $tenantsCount }} penghuni aktif<span class="hidden sm:inline"> · ketuk pintu untuk membuka rinciannya</span>
                 </p>
             </div>
-            <div class="grid grid-cols-1 sm:flex sm:flex-wrap gap-2.5">
-                <a href="{{ route('pengelola.tagihan.index') }}" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-surface text-brand-deep text-sm font-semibold shadow-sm hover:bg-brand-wash transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    Cek tagihan
-                </a>
-                <a href="{{ route('pengelola.penghuni.index') }}" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-surface/15 text-surface text-sm font-semibold ring-1 ring-inset ring-surface/40 hover:bg-surface/25 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    Daftarkan penghuni
-                </a>
-                <a href="{{ route('pengelola.prediksi.index') }}" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-surface/15 text-surface text-sm font-semibold ring-1 ring-inset ring-surface/40 hover:bg-surface/25 transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                    Rencana belanja
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- KPI: 2 kolom di ponsel, 4 kolom di layar lebar -->
-    <section aria-label="Ringkasan angka penting" class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <div class="stat-card p-4 sm:p-5" data-tone="brand">
-            <div class="flex items-start justify-between gap-2">
-                <span class="text-2xs sm:text-xs font-bold text-ink-soft uppercase tracking-wide">Pendapatan bulan ini</span>
-                <span class="hidden sm:flex w-9 h-9 rounded-xl bg-brand-wash text-brand items-center justify-center shrink-0" aria-hidden="true">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </span>
-            </div>
-            <p class="mt-2 text-xl sm:text-3xl font-extrabold text-ink tabular-nums">Rp {{ number_format($totalIncomeThisMonth, 0, ',', '.') }}</p>
-            <dl class="mt-3 pt-3 border-t border-line text-xs text-ink-soft space-y-1">
-                <div class="flex justify-between gap-2"><dt>Sewa</dt><dd class="font-semibold text-ink tabular-nums">Rp {{ number_format($rentIncomeThisMonth, 0, ',', '.') }}</dd></div>
-                <div class="flex justify-between gap-2"><dt>Warkop &amp; galon</dt><dd class="font-semibold text-ochre-ink tabular-nums">Rp {{ number_format($serviceSalesThisMonth, 0, ',', '.') }}</dd></div>
-            </dl>
+            <a href="{{ route('pengelola.kamar.index') }}" class="text-xs font-semibold text-brand hover:underline underline-offset-2">Kelola kamar</a>
         </div>
 
-        <div class="stat-card p-4 sm:p-5" data-tone="process">
-            <div class="flex items-start justify-between gap-2">
-                <span class="text-2xs sm:text-xs font-bold text-ink-soft uppercase tracking-wide">Okupansi kamar</span>
-                <span class="hidden sm:flex w-9 h-9 rounded-xl bg-process-wash text-process items-center justify-center shrink-0" aria-hidden="true">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                </span>
-            </div>
-            <p class="mt-2 text-xl sm:text-3xl font-extrabold text-ink tabular-nums">{{ $occupiedRoomsCount }}<span class="text-ink-faint font-bold"> / {{ $roomsCount }}</span></p>
-            <div class="mt-2 h-2 rounded-full bg-process-wash overflow-hidden" role="progressbar" aria-valuenow="{{ $occ }}" aria-valuemin="0" aria-valuemax="100" aria-label="Kamar terisi">
-                <div class="h-full rounded-full bg-process" style="width: {{ $occ }}%"></div>
-            </div>
-            <dl class="mt-3 pt-3 border-t border-line text-xs text-ink-soft space-y-1">
-                <div class="flex justify-between gap-2"><dt>Terisi</dt><dd class="font-semibold text-ink tabular-nums">{{ $occ }}%</dd></div>
-                <div class="flex justify-between gap-2"><dt>Kosong / perbaikan</dt><dd class="font-semibold text-ink tabular-nums">{{ $availableRoomsCount }} / {{ $repairRoomsCount }}</dd></div>
-            </dl>
-        </div>
+        <ul class="mt-3 flex flex-wrap gap-1.5" aria-label="Keterangan status">
+            @foreach($stateStyle as $key => $st)
+                @if($stateCounts->get($key))
+                    <li class="inline-flex items-center gap-1.5 rounded-full border border-line bg-canvas/60 pl-2 pr-2.5 py-0.5 text-[11px] font-semibold text-ink-soft">
+                        <span class="w-2 h-2 rounded-full {{ $st['dot'] }}"></span>{{ $st['label'] }}
+                        <span class="font-mono text-ink tabular-nums">{{ $stateCounts->get($key) }}</span>
+                    </li>
+                @endif
+            @endforeach
+        </ul>
 
-        <div class="stat-card p-4 sm:p-5" data-tone="ochre">
-            <div class="flex items-start justify-between gap-2">
-                <span class="text-2xs sm:text-xs font-bold text-ink-soft uppercase tracking-wide">Penghuni aktif</span>
-                <span class="hidden sm:flex w-9 h-9 rounded-xl bg-ochre-wash text-ochre-ink items-center justify-center shrink-0" aria-hidden="true">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                </span>
-            </div>
-            <p class="mt-2 flex items-baseline gap-1.5">
-                <span class="text-xl sm:text-3xl font-extrabold text-ink tabular-nums">{{ $tenantsCount }}</span>
-                <span class="text-sm font-medium text-ink-soft">orang</span>
-            </p>
-            <div class="mt-3 pt-3 border-t border-line text-xs">
-                <a href="{{ route('pengelola.penghuni.index') }}" class="inline-flex items-center gap-1 font-semibold text-brand hover:text-brand-deep underline-offset-2 hover:underline py-1">Kelola penghuni <span aria-hidden="true">&rarr;</span></a>
-            </div>
-        </div>
-
-        <div class="stat-card p-4 sm:p-5" data-tone="{{ $pendingRentThisMonth > 0 ? 'alert' : 'done' }}">
-            <div class="flex items-start justify-between gap-2">
-                <span class="text-2xs sm:text-xs font-bold text-ink-soft uppercase tracking-wide">Tagihan tertunda</span>
-                <span class="hidden sm:flex w-9 h-9 rounded-xl {{ $pendingRentThisMonth > 0 ? 'bg-alert-wash text-alert' : 'bg-done-wash text-done' }} items-center justify-center shrink-0" aria-hidden="true">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </span>
-            </div>
-            <p class="mt-2 text-xl sm:text-3xl font-extrabold tabular-nums {{ $pendingRentThisMonth > 0 ? 'text-alert' : 'text-done' }}">Rp {{ number_format($pendingRentThisMonth, 0, ',', '.') }}</p>
-            <div class="mt-3 pt-3 border-t border-line text-xs flex flex-wrap items-center justify-between gap-x-2">
-                <span class="font-semibold {{ $overdueBills->count() ? 'text-alert' : 'text-done' }}">{{ $overdueBills->count() ? $overdueBills->count() . ' perlu ditagih' : 'Semua lancar' }}</span>
-                <a href="{{ route('pengelola.tagihan.index') }}" class="font-semibold text-brand hover:text-brand-deep underline-offset-2 hover:underline py-1">Lihat <span aria-hidden="true">&rarr;</span></a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Peringatan tagihan menunggak -->
-    @if($overdueBills->isNotEmpty())
-        <div role="alert" class="p-4 sm:p-5 bg-alert-wash border border-alert/30 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-            <div class="flex items-start gap-3 flex-1 min-w-0">
-                <svg class="w-6 h-6 text-alert shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                </svg>
-                <div class="min-w-0">
-                    <h3 class="text-sm font-bold text-ink">{{ $overdueBills->count() }} tagihan sewa melewati jatuh tempo</h3>
-                    <p class="text-sm text-ink-soft mt-0.5">
-                        @foreach($overdueBills as $ob)
-                            <span class="font-semibold text-ink whitespace-nowrap">{{ $ob->room->room_number }} ({{ $ob->tenantProfile->user->name ?? 'Penghuni' }})</span>{{ !$loop->last ? ', ' : '' }}
+        <div class="mt-4 space-y-4">
+            @foreach($blocks as $block => $blockRooms)
+                <div class="sm:flex sm:gap-3">
+                    <div class="sm:w-7 shrink-0 flex sm:items-end sm:pb-1 mb-1.5 sm:mb-0">
+                        <span class="font-mono text-[11px] font-bold text-ink-faint tracking-widest sm:[writing-mode:vertical-rl] sm:rotate-180">BLOK {{ $block }}</span>
+                    </div>
+                    <div class="flex-1 grid grid-cols-5 gap-1.5 sm:gap-3 border-b-4 border-line/80 pb-2 sm:pb-2.5">
+                        @foreach($blockRooms as $room)
+                            @php
+                                $state = $roomState($room);
+                                $st = $stateStyle[$state];
+                                $tenantName = $room->activeTenantProfile?->user?->name;
+                                $href = in_array($state, ['menunggak', 'menunggu', 'cek'])
+                                    ? route('pengelola.tagihan.index', ['month' => 'semua', 'year' => 'semua', 'q' => $short($room->room_number)])
+                                    : ($state === 'kosong' ? route('pengelola.penghuni.index', ['baru' => 1]) : route('pengelola.kamar.index'));
+                            @endphp
+                            <a href="{{ $href }}"
+                               class="room-door group relative flex flex-col items-center text-center overflow-hidden rounded-t-2xl sm:rounded-t-[1.25rem] rounded-b-md border-2 px-1 sm:px-1.5 pt-2 sm:pt-2.5 sm:pb-2 min-h-[86px] sm:min-h-[112px] {{ $st['door'] }}"
+                               title="{{ $room->room_number }} · {{ $st['label'] }}{{ $tenantName ? ' · ' . $tenantName : '' }}">
+                                <span class="rounded border border-ink/25 bg-surface px-1 sm:px-1.5 font-mono text-[10px] sm:text-[11px] font-bold leading-4 text-ink">{{ $short($room->room_number) }}</span>
+                                <span class="mt-1.5 sm:mt-2 w-full text-[11px] sm:text-xs font-semibold text-ink leading-tight truncate sm:whitespace-normal sm:line-clamp-2">{{ $tenantName ? Str::of($tenantName)->before(' ') : '—' }}</span>
+                                <span class="absolute right-1.5 sm:right-2.5 top-[56%] w-1.5 h-1.5 rounded-full bg-ink/40" aria-hidden="true"></span>
+                                <span class="hidden sm:inline-block mt-auto rounded-full px-1.5 py-0.5 text-[10.5px] font-bold whitespace-nowrap {{ $st['pill'] }}">{{ $st['label'] }}</span>
+                                <span class="sm:hidden mt-auto h-1.5 w-[calc(100%+0.5rem)] {{ $st['dot'] }}" aria-hidden="true"></span>
+                                <span class="sr-only sm:hidden">{{ $st['label'] }}</span>
+                            </a>
                         @endforeach
-                    </p>
+                    </div>
                 </div>
-            </div>
-            <a href="{{ route('pengelola.tagihan.index') }}" class="inline-flex justify-center items-center text-sm font-bold text-surface bg-alert hover:bg-alert/90 px-4 py-2.5 rounded-xl transition-colors shrink-0">
-                Tinjau tagihan
-            </a>
+            @endforeach
         </div>
-    @endif
+    </section>
 
-    <!-- Grafik Perbandingan Finansial 6 Bulan (Chart.js) -->
-    <div class="bg-surface rounded-2xl border border-line shadow-xs p-6">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-line gap-2">
-            <div>
-                <h3 class="font-bold text-sm text-ink">Tren Pendapatan 6 Bulan Terakhir</h3>
-                <p class="text-xs text-ink-soft">Perbandingan perolehan uang sewa kamar vs omzet penjualan warkop & galon</p>
-            </div>
-            <div class="flex items-center space-x-4 text-xs font-medium">
-                <div class="flex items-center space-x-1.5">
-                    <span class="w-3 h-3 rounded-md bg-brand inline-block"></span>
-                    <span class="text-ink-soft">Sewa Kamar</span>
-                </div>
-                <div class="flex items-center space-x-1.5">
-                    <span class="w-3 h-3 rounded-md bg-ochre inline-block"></span>
-                    <span class="text-ink-soft">Warkop & Galon</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="mt-4 relative h-72 w-full">
-            <canvas id="revenueTrendChart" role="img" aria-label="Grafik batang pendapatan sewa kamar dan penjualan warkop selama enam bulan terakhir"></canvas>
-        </div>
-    </div>
-
-    <!-- 2 Column Section: Pesanan Terbaru & Ringkasan Hunian/Stok -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <!-- Left Column: Pesanan Terbaru (2 Cols) -->
-        <div class="lg:col-span-2 bg-surface rounded-2xl border border-line shadow-xs overflow-hidden">
-            <div class="p-5 border-b border-line flex items-center justify-between">
+    <!-- 4. Pesanan terbaru + belanja kios -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <section aria-labelledby="order-title" class="lg:col-span-2 bg-surface rounded-3xl border border-line shadow-xs overflow-hidden">
+            <div class="px-5 pt-5 pb-3 flex items-center justify-between gap-2">
                 <div>
-                    <h3 class="font-bold text-sm text-ink">Pesanan Layanan Kamar Terbaru</h3>
-                    <p class="text-xs text-ink-soft">Aktivitas pesanan warkop & galon terkini dari penghuni</p>
+                    <h2 id="order-title" class="text-base font-bold text-ink">Pesanan kios terbaru</h2>
+                    <p class="text-xs text-ink-soft">{{ $activeOrdersCount }} sedang diproses petugas</p>
                 </div>
-                <span class="text-xs font-semibold text-brand bg-brand-wash px-2.5 py-1 rounded-lg border border-brand/20">
-                    {{ $activeOrdersCount }} Aktif Diproses
-                </span>
             </div>
-
-            <div class="divide-y divide-line">
+            <ul class="divide-y divide-line" role="list">
                 @forelse($recentOrders as $order)
-                    @php
-                        $badge = $order->status_badge;
-                    @endphp
-                    <div class="p-4 sm:p-5 hover:bg-canvas transition-colors flex items-center justify-between">
-                        <div class="flex items-start space-x-3.5">
-                            <div class="w-10 h-10 rounded-xl bg-canvas text-ink flex items-center justify-center flex-shrink-0 border border-line">
-                                @if($order->order_type === 'quick_galon')
-                                    <svg class="w-5 h-5 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
-                                    </svg>
-                                @else
-                                    <svg class="w-5 h-5 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                                    </svg>
-                                @endif
+                    <li class="px-4 sm:px-5 py-3 items-start gap-3 {{ $loop->index >= 4 ? 'hidden sm:flex' : 'flex' }}">
+                        <span class="mt-0.5 rounded border border-ink/25 px-1.5 font-mono text-[11px] font-bold leading-5 text-ink shrink-0">{{ $short($order->room_number) }}</span>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-baseline justify-between gap-3">
+                                <p class="text-sm text-ink truncate">{{ $order->items->pluck('item_name')->join(', ') }}</p>
+                                <p class="text-sm font-bold text-ink tabular-nums whitespace-nowrap">{{ $order->formatted_total }}</p>
                             </div>
-                            <div>
-                                <div class="flex items-center space-x-2">
-                                    <span class="font-bold text-sm text-ink">{{ $order->room_number }}</span>
-                                    <span class="text-xs text-ink-faint font-mono">&bull; {{ $order->order_code }}</span>
-                                </div>
-                                <p class="text-xs text-ink-soft mt-0.5">
-                                    {{ $order->items->pluck('item_name')->join(', ') }}
-                                </p>
-                                <span class="text-2xs text-ink-faint mt-1 block">
-                                    {{ $order->created_at->diffForHumans() }} &bull; {{ $order->payment_method }}
-                                </span>
+                            <div class="mt-1 flex items-center justify-between gap-3">
+                                <p class="text-2xs text-ink-faint truncate">{{ $order->created_at->diffForHumans() }} · {{ $order->payment_method }}</p>
+                                <x-status-badge :status="$order->status" :label="$order->status_badge['label']" />
                             </div>
                         </div>
-
-                        <div class="text-right flex-shrink-0 ml-4">
-                            <x-status-badge :status="$order->status" :label="$badge['label']" />
-                            <p class="text-sm font-extrabold text-ink tabular-nums mt-1.5 whitespace-nowrap">
-                                {{ $order->formatted_total }}
-                            </p>
-                        </div>
-                    </div>
+                    </li>
                 @empty
-                    <div class="p-8 text-center text-ink-faint text-xs">
-                        Belum ada pesanan layanan yang tercatat.
-                    </div>
+                    <li class="px-5 py-8 text-center text-ink-faint text-xs">Belum ada pesanan.</li>
                 @endforelse
+            </ul>
+        </section>
+
+        <section aria-labelledby="shop-title" class="bg-surface rounded-3xl border border-line shadow-xs p-5">
+            <div class="flex items-center justify-between">
+                <h2 id="shop-title" class="text-base font-bold text-ink">Belanja kios</h2>
+                <a href="{{ route('pengelola.prediksi.index') }}" class="text-xs font-semibold text-brand hover:underline underline-offset-2">Rincian</a>
             </div>
-        </div>
-
-        <!-- Right Column: Status Hunian & Prediksi Stok (1 Col) -->
-        <div class="space-y-6">
-            <!-- Kapasitas Hunian -->
-            <div class="bg-surface rounded-2xl border border-line shadow-xs p-5">
-                <div class="flex items-center justify-between mb-1">
-                    <h3 class="font-bold text-sm text-ink">Status Hunian Kos</h3>
-                    <a href="{{ route('pengelola.kamar.index') }}" class="text-xs text-brand font-semibold hover:text-brand-deep">Detail &rarr;</a>
-                </div>
-                <p class="text-xs text-ink-soft mb-4">Total 10 Kamar di Kos Tiana Putra 1</p>
-
-                <div class="space-y-3">
-                    <div class="flex items-center justify-between text-xs">
-                        <span class="flex items-center text-ink-soft">
-                            <span class="w-2.5 h-2.5 rounded-full bg-done mr-2"></span>
-                            Kamar Terisi
-                        </span>
-                        <span class="font-bold text-ink tabular-nums">{{ $occupiedRoomsCount }} Kamar</span>
-                    </div>
-                    <div class="flex items-center justify-between text-xs">
-                        <span class="flex items-center text-ink-soft">
-                            <span class="w-2.5 h-2.5 rounded-full bg-brand mr-2"></span>
-                            Kamar Tersedia
-                        </span>
-                        <span class="font-bold text-ink tabular-nums">{{ $availableRoomsCount }} Kamar</span>
-                    </div>
-                    <div class="flex items-center justify-between text-xs">
-                        <span class="flex items-center text-ink-soft">
-                            <span class="w-2.5 h-2.5 rounded-full bg-wait mr-2"></span>
-                            Dalam Perbaikan
-                        </span>
-                        <span class="font-bold text-ink tabular-nums">{{ $repairRoomsCount }} Kamar</span>
-                    </div>
-                </div>
-
-                <div class="mt-4 pt-4 border-t border-line">
-                    @php
-                        $terisiPct = round(($occupiedRoomsCount / max($roomsCount, 1)) * 100);
-                        $tersediaPct = round(($availableRoomsCount / max($roomsCount, 1)) * 100);
-                        $perbaikanPct = 100 - $terisiPct - $tersediaPct;
-                    @endphp
-                    <div class="w-full bg-canvas rounded-full h-2.5 flex overflow-hidden border border-line">
-                        <div class="bg-done h-2.5" style="width: {{ $terisiPct }}%"></div>
-                        <div class="bg-brand h-2.5" style="width: {{ $tersediaPct }}%"></div>
-                        <div class="bg-wait h-2.5" style="width: {{ max($perbaikanPct, 0) }}%"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Rekomendasi Pengadaan & Belanja Stok -->
-            <div class="bg-surface rounded-2xl border border-line shadow-xs p-5">
-                <div class="flex items-center justify-between mb-1.5">
-                    <h3 class="font-bold text-sm text-ink">Pengingat Belanja Stok</h3>
-                    <a href="{{ route('pengelola.prediksi.index') }}" class="text-xs text-brand font-semibold hover:text-brand-deep">
-                        Buka Rincian &rarr;
-                    </a>
-                </div>
-                <p class="text-xs text-ink-soft mb-3.5">Barang yang perlu disiapkan untuk 7 hari ke depan:</p>
-
-                <div class="space-y-2.5">
-                    @php
-                        $restockItems = $predictions->filter(fn($p) => $p->recommended_restock_qty > 0)->take(4);
-                    @endphp
-                    @forelse($restockItems as $pred)
-                        <div class="p-3 rounded-xl bg-canvas border border-line">
-                            <div class="flex items-center justify-between gap-2">
-                                <span class="text-xs font-bold text-ink truncate">{{ $pred->catalogItem->name ?? 'Item' }}</span>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold shrink-0 {{ $pred->status === 'kritis' ? 'bg-alert-wash text-alert border border-alert/20' : 'bg-wait-wash text-wait border border-wait/20' }}">
-                                    {{ $pred->status === 'kritis' ? 'Segera Beli' : 'Perlu Ditambah' }}
-                                </span>
-                            </div>
-                            <div class="mt-2 flex items-center justify-between text-xs text-ink-soft">
-                                <span>Sisa di kos: <strong class="text-ink tabular-nums">{{ $pred->current_stock }}</strong> {{ $pred->catalogItem->unit ?? '' }}</span>
-                                <span>Cukup: <strong class="text-ink tabular-nums">~{{ $pred->days_of_supply }} hari</strong></span>
-                            </div>
-                            <div class="mt-2 pt-2 border-t border-line/60 flex items-center justify-between text-xs">
-                                <span class="text-ink-soft">Saran beli:</span>
-                                <span class="font-bold text-brand tabular-nums">
-                                    +{{ $pred->recommended_restock_qty }} {{ $pred->catalogItem->unit ?? '' }}
-                                </span>
-                            </div>
+            <p class="text-xs text-ink-soft mt-0.5">Saran untuk 7 hari ke depan</p>
+            @php $restockItems = $predictions->filter(fn ($p) => $p->recommended_restock_qty > 0)->take(5); @endphp
+            <ul class="mt-3 space-y-2" role="list">
+                @forelse($restockItems as $pred)
+                    <li class="flex items-center gap-3 rounded-2xl bg-canvas/70 px-3 py-2.5">
+                        <span class="w-2 h-2 rounded-full shrink-0 {{ $pred->status === 'kritis' ? 'bg-alert' : 'bg-wait' }}" aria-hidden="true"></span>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-ink truncate">{{ $pred->catalogItem->name ?? 'Item' }}</p>
+                            <p class="text-2xs text-ink-soft">Sisa {{ $pred->current_stock }} · cukup ~{{ $pred->days_of_supply }} hari</p>
                         </div>
-                    @empty
-                        <div class="p-4 text-center text-xs text-ink-faint space-y-1">
-                            <p class="font-bold text-done">Persediaan Kos Masih Aman</p>
-                            <p class="text-2xs">Seluruh stok warkop dan galon mencukupi untuk 7 hari ke depan.</p>
-                        </div>
-                    @endforelse
-                </div>
-            </div>
-
-            <!-- Peringatan Stok Menipis -->
-            @if($stockAlerts->isNotEmpty())
-                <div class="bg-surface border border-line border-l-4 border-l-alert rounded-2xl p-5 shadow-xs">
-                    <h4 class="text-xs font-bold text-ink flex items-center">
-                        <svg class="w-4 h-4 mr-1.5 text-alert" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                        </svg>
-                        Peringatan Stok di Bawah Minimum
-                    </h4>
-                    <p class="text-xs text-alert mt-1 font-medium">Item berikut mendekati atau sudah habis:</p>
-                    <div class="mt-3 space-y-1.5">
-                        @foreach($stockAlerts as $item)
-                            <div class="flex items-center justify-between text-xs bg-canvas p-2.5 rounded-lg border border-line">
-                                <span class="font-semibold text-ink">{{ $item->name }}</span>
-                                <span class="text-alert font-bold tabular-nums">Sisa {{ $item->stock }} {{ $item->unit }}</span>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
-        </div>
-
+                        <span class="font-mono text-sm font-bold text-brand tabular-nums shrink-0">+{{ $pred->recommended_restock_qty }}</span>
+                    </li>
+                @empty
+                    <li class="rounded-2xl bg-done-wash px-3 py-4 text-center text-xs text-done font-semibold">Stok kios aman untuk 7 hari ke depan.</li>
+                @endforelse
+            </ul>
+        </section>
     </div>
 
+    <!-- 5. Tren pemasukan -->
+    <section aria-labelledby="trend-title" class="bg-surface rounded-3xl border border-line shadow-xs p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+                <h2 id="trend-title" class="text-base font-bold text-ink">Pemasukan 6 bulan terakhir</h2>
+                <p class="text-xs text-ink-soft">Uang sewa kamar dibanding penjualan kios &amp; galon</p>
+            </div>
+            <div class="flex items-center gap-4 text-xs font-medium text-ink-soft">
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-brand"></span>Sewa</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-ochre"></span>Kios &amp; galon</span>
+            </div>
+        </div>
+        <div class="mt-4 relative h-48 sm:h-60 w-full">
+            <canvas id="revenueTrendChart" role="img" aria-label="Grafik batang pemasukan sewa kamar dan penjualan kios selama enam bulan terakhir"></canvas>
+        </div>
+    </section>
 </div>
 @endsection
 
@@ -366,7 +339,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     categoryPercentage: 0.7
                 },
                 {
-                    label: 'Warkop & Galon',
+                    label: 'Kios & Galon',
                     data: salesData,
                     backgroundColor: '#c98a2b',
                     borderRadius: 4,

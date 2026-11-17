@@ -166,4 +166,23 @@ class Order extends Model
 
         return "{$minutes}m";
     }
+
+    /**
+     * Lama pesanan sejak masuk dalam bahasa sehari-hari untuk petugas ("12 menit", "3 jam", "8 hari").
+     */
+    public function getWaitLabelAttribute(): string
+    {
+        if (!$this->created_at) {
+            return '';
+        }
+
+        $minutes = max(0, (int) $this->created_at->diffInMinutes(now()));
+
+        return match (true) {
+            $minutes < 1     => 'baru saja',
+            $minutes < 60    => "{$minutes} menit",
+            $minutes < 1440  => intdiv($minutes, 60) . ' jam',
+            default          => intdiv($minutes, 1440) . ' hari',
+        };
+    }
 }

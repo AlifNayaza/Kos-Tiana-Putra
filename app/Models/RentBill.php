@@ -49,6 +49,13 @@ class RentBill extends Model
         return $this->belongsTo(User::class, 'confirmed_by');
     }
 
+    /** Tagihan belum lunas yang sudah melewati jatuh tempo, dari periode mana pun. */
+    public function scopeOverdue($query)
+    {
+        return $query->whereIn('status', ['menunggu', 'menunggak'])
+            ->where('due_date', '<', now()->toDateString());
+    }
+
     public function getMonthNameAttribute(): string
     {
         $months = [

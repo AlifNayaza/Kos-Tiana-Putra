@@ -4,7 +4,7 @@
 @section('page_subtitle', 'Verifikasi bukti transfer, pemantauan jatuh tempo, dan generate tagihan sewa bulanan')
 
 @section('content')
-<div class="space-y-6" x-data="{ 
+<div class="space-y-6" @if(request()->boolean('baru')) x-init="$nextTick(() => { generateModalOpen = true })" @endif x-data="{
     generateModalOpen: false, 
     proofModalOpen: false, 
     proofImageUrl: '',
@@ -17,17 +17,17 @@
 }">
 
     <!-- Stats Bar -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <!-- Lunas -->
-        <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex items-center justify-between">
+        <div class="bg-surface p-4 sm:p-5 rounded-2xl border border-line shadow-xs flex items-center justify-between gap-2">
             <div>
-                <p class="text-xs font-semibold text-ink-soft uppercase tracking-wider">Total Lunas Terkumpul</p>
-                <div class="mt-2 text-2xl font-extrabold text-done tabular-nums">
+                <p class="text-2xs sm:text-xs font-semibold text-ink-soft uppercase tracking-wider">Total Lunas Terkumpul</p>
+                <div class="mt-1.5 sm:mt-2 text-lg sm:text-2xl font-extrabold text-done tabular-nums">
                     Rp {{ number_format($stats['lunas_sum'], 0, ',', '.') }}
                 </div>
                 <p class="text-2xs text-ink-faint mt-1">Periode {{ is_numeric($monthFilter) ? \Carbon\Carbon::create(null, (int) $monthFilter)->translatedFormat('F') : 'Semua bulan' }} {{ is_numeric($yearFilter) ? $yearFilter : 'Semua tahun' }}</p>
             </div>
-            <div class="w-12 h-12 rounded-xl bg-done-wash border border-done/20 text-done flex items-center justify-center flex-shrink-0">
+            <div class="hidden sm:flex w-12 h-12 rounded-xl bg-done-wash border border-done/20 text-done items-center justify-center flex-shrink-0">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
@@ -35,15 +35,22 @@
         </div>
 
         <!-- Tertunda / Menunggak -->
-        <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex items-center justify-between">
+        <div class="bg-surface p-4 sm:p-5 rounded-2xl border border-line shadow-xs flex items-center justify-between gap-2">
             <div>
-                <p class="text-xs font-semibold text-ink-soft uppercase tracking-wider">Tertunda / Menunggak</p>
-                <div class="mt-2 text-2xl font-extrabold text-alert tabular-nums">
+                <p class="text-2xs sm:text-xs font-semibold text-ink-soft uppercase tracking-wider">Tertunda / Menunggak</p>
+                <div class="mt-1.5 sm:mt-2 text-lg sm:text-2xl font-extrabold text-alert tabular-nums">
                     Rp {{ number_format($stats['menunggu_sum'], 0, ',', '.') }}
                 </div>
-                <p class="text-2xs text-ink-faint mt-1">Belum terlunasi</p>
+                @if($stats['arrears_other_sum'] > 0)
+                    <p class="text-2xs text-ink-faint mt-1">
+                        Periode ini Rp {{ number_format($stats['period_open_sum'], 0, ',', '.') }}
+                        + tunggakan bulan lain <span class="font-semibold text-alert">Rp {{ number_format($stats['arrears_other_sum'], 0, ',', '.') }}</span>
+                    </p>
+                @else
+                    <p class="text-2xs text-ink-faint mt-1">Belum terlunasi</p>
+                @endif
             </div>
-            <div class="w-12 h-12 rounded-xl bg-alert-wash border border-alert/20 text-alert flex items-center justify-center flex-shrink-0">
+            <div class="hidden sm:flex w-12 h-12 rounded-xl bg-alert-wash border border-alert/20 text-alert items-center justify-center flex-shrink-0">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
@@ -51,18 +58,18 @@
         </div>
 
         <!-- Butuh Verifikasi Bukti -->
-        <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex items-center justify-between">
+        <div class="bg-surface p-4 sm:p-5 rounded-2xl border border-line shadow-xs flex items-center justify-between gap-2">
             <div>
-                <p class="text-xs font-semibold text-ink-soft uppercase tracking-wider">Verifikasi Bukti</p>
-                <div class="mt-2 flex items-baseline space-x-2">
-                    <span class="text-2xl font-extrabold text-ink tabular-nums">{{ $stats['need_verify'] }}</span>
+                <p class="text-2xs sm:text-xs font-semibold text-ink-soft uppercase tracking-wider">Verifikasi Bukti</p>
+                <div class="mt-1.5 sm:mt-2 flex items-baseline space-x-2">
+                    <span class="text-lg sm:text-2xl font-extrabold text-ink tabular-nums">{{ $stats['need_verify'] }}</span>
                     <span class="text-xs font-semibold text-brand bg-brand-wash px-2 py-0.5 rounded-full border border-brand/20">
                         Bukti Masuk
                     </span>
                 </div>
                 <p class="text-2xs text-ink-faint mt-1">Menunggu validasi pengelola</p>
             </div>
-            <div class="w-12 h-12 rounded-xl bg-brand-wash border border-brand/20 text-brand flex items-center justify-center flex-shrink-0">
+            <div class="hidden sm:flex w-12 h-12 rounded-xl bg-brand-wash border border-brand/20 text-brand items-center justify-center flex-shrink-0">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
@@ -70,21 +77,39 @@
         </div>
 
         <!-- Total Lembar Tagihan -->
-        <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex items-center justify-between">
+        <div class="bg-surface p-4 sm:p-5 rounded-2xl border border-line shadow-xs flex items-center justify-between gap-2">
             <div>
-                <p class="text-xs font-semibold text-ink-soft uppercase tracking-wider">Total Lembar Tagihan</p>
-                <div class="mt-2 text-2xl font-extrabold text-ink tabular-nums">
+                <p class="text-2xs sm:text-xs font-semibold text-ink-soft uppercase tracking-wider">Total Lembar Tagihan</p>
+                <div class="mt-1.5 sm:mt-2 text-lg sm:text-2xl font-extrabold text-ink tabular-nums">
                     {{ $stats['total_bills'] }}
                 </div>
-                <p class="text-2xs text-ink-faint mt-1">Seluruh kamar aktif</p>
+                <p class="text-2xs text-ink-faint mt-1">{{ $stats['total_bills'] > 0 ? 'Pada periode ini' : 'Belum diterbitkan untuk periode ini' }}</p>
             </div>
-            <div class="w-12 h-12 rounded-xl bg-canvas border border-line text-ink flex items-center justify-center flex-shrink-0">
+            <div class="hidden sm:flex w-12 h-12 rounded-xl bg-canvas border border-line text-ink items-center justify-center flex-shrink-0">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
                 </svg>
             </div>
         </div>
     </div>
+
+    <!-- Peringatan tunggakan lintas periode -->
+    @if($stats['overdue_count'] > 0 && $statusFilter !== 'jatuh_tempo')
+        <div role="alert" class="p-4 sm:p-5 bg-alert-wash border border-alert/30 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            <div class="flex items-start gap-3 flex-1 min-w-0">
+                <svg class="w-6 h-6 text-alert shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                <div class="min-w-0">
+                    <h3 class="text-sm font-bold text-ink">{{ $stats['overdue_count'] }} tagihan melewati jatuh tempo &middot; Rp {{ number_format($stats['overdue_sum'], 0, ',', '.') }}</h3>
+                    <p class="text-xs text-ink-soft mt-0.5">Termasuk tagihan bulan sebelumnya yang tidak tampil pada filter periode ini.</p>
+                </div>
+            </div>
+            <a href="{{ route('pengelola.tagihan.index', ['month' => 'semua', 'year' => 'semua', 'status' => 'jatuh_tempo']) }}" class="inline-flex justify-center items-center text-sm font-bold text-surface bg-alert hover:bg-alert/90 px-4 py-2.5 rounded-xl transition-colors shrink-0">
+                Lihat tagihan jatuh tempo
+            </a>
+        </div>
+    @endif
 
     <!-- Filter & Action Header -->
     <div class="bg-surface p-4 sm:p-5 rounded-2xl border border-line shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -95,6 +120,7 @@
                 <label for="month" class="sr-only">Bulan</label>
                 <select name="month" id="month" onchange="this.form.submit()" 
                         class="text-xs font-semibold rounded-xl border border-line text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none py-2 pl-3 pr-8 bg-canvas">
+                    <option value="semua" {{ $monthFilter === 'semua' ? 'selected' : '' }}>Semua bulan</option>
                     @for($m = 1; $m <= 12; $m++)
                         <option value="{{ $m }}" {{ $monthFilter == $m ? 'selected' : '' }}>
                             {{ \Carbon\Carbon::create(null, $m)->translatedFormat('F') }}
@@ -108,6 +134,7 @@
                 <label for="year" class="sr-only">Tahun</label>
                 <select name="year" id="year" onchange="this.form.submit()" 
                         class="text-xs font-semibold rounded-xl border border-line text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none py-2 pl-3 pr-8 bg-canvas">
+                    <option value="semua" {{ $yearFilter === 'semua' ? 'selected' : '' }}>Semua tahun</option>
                     @foreach([2025, 2026, 2027] as $y)
                         <option value="{{ $y }}" {{ $yearFilter == $y ? 'selected' : '' }}>{{ $y }}</option>
                     @endforeach
@@ -123,6 +150,7 @@
                     <option value="menunggu" {{ $statusFilter === 'menunggu' ? 'selected' : '' }}>Menunggu Bayar</option>
                     <option value="lunas" {{ $statusFilter === 'lunas' ? 'selected' : '' }}>Lunas Terverifikasi</option>
                     <option value="menunggak" {{ $statusFilter === 'menunggak' ? 'selected' : '' }}>Menunggak</option>
+                    <option value="jatuh_tempo" {{ $statusFilter === 'jatuh_tempo' ? 'selected' : '' }}>Lewat jatuh tempo</option>
                 </select>
             </div>
 

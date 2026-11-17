@@ -497,6 +497,62 @@ textarea {
     color: #fff;
 }
 
+/* Pola ubin lantai kos (sama dengan halaman masuk) di atas latar sidebar */
+.nav-dark.nav-tiles {
+    background:
+        linear-gradient(rgb(255 255 255 / .035) 1px, transparent 1px) 0 0 / 26px 26px,
+        linear-gradient(90deg, rgb(255 255 255 / .035) 1px, transparent 1px) 0 0 / 26px 26px,
+        radial-gradient(20rem 14rem at 0% 0%, color-mix(in srgb, var(--color-brand) 60%, #000), transparent 70%),
+        linear-gradient(180deg, #003a35, #00231f);
+}
+
+/* Item menu samping. Yang aktif menyambung ke area konten seperti tab map (desktop). */
+.nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin-right: .75rem;
+    padding: .625rem .75rem;
+    border-radius: .875rem;
+    font-size: .9375rem;
+    font-weight: 500;
+    color: rgb(255 255 255 / .82);
+    transition: background-color .15s ease, color .15s ease;
+}
+.nav-item svg { color: rgb(255 255 255 / .6); transition: color .15s ease; }
+.nav-item:hover { background: rgb(255 255 255 / .08); color: #fff; }
+.nav-item:hover svg { color: #fff; }
+.nav-item:focus-visible { outline: 2px solid var(--color-ochre); outline-offset: 2px; }
+.nav-item.is-active { background: var(--color-canvas); color: var(--color-brand-deep); font-weight: 700; }
+.nav-item.is-active svg { color: var(--color-brand); }
+.nav-item.is-active::before {
+    content: '';
+    position: absolute;
+    left: -.75rem;
+    top: 24%;
+    bottom: 24%;
+    width: 4px;
+    border-radius: 0 4px 4px 0;
+    background: var(--color-ochre);
+}
+@media (min-width: 1024px) {
+    aside .nav-item.is-active { margin-right: 0; border-radius: .875rem 0 0 .875rem; }
+    /* Sudut cekung di atas & bawah tab aktif */
+    aside .nav-item.is-active::after {
+        content: '';
+        position: absolute;
+        right: 0;
+        top: -.875rem;
+        bottom: -.875rem;
+        width: .875rem;
+        pointer-events: none;
+        background:
+            radial-gradient(circle at 0 0, transparent .875rem, var(--color-canvas) calc(.875rem + .5px)) top / .875rem .875rem no-repeat,
+            radial-gradient(circle at 0 100%, transparent .875rem, var(--color-canvas) calc(.875rem + .5px)) bottom / .875rem .875rem no-repeat;
+    }
+}
+
 /* Bilah aplikasi berwarna (penghuni & petugas) */
 .app-bar {
     background:
@@ -535,7 +591,6 @@ textarea {
 .cat-tile[data-cat='makanan'] { background: var(--color-ochre-wash); color: var(--color-ochre-ink); }
 .cat-tile[data-cat='minuman'] { background: var(--color-process-wash); color: var(--color-process); }
 .cat-tile[data-cat='galon'] { background: var(--color-brand-wash); color: var(--color-brand); }
-.cat-tile--photo { width: 4rem; height: 4rem; overflow: hidden; border: 1px solid var(--color-line); }
 
 /* Tombol yang sedang memproses (dikunci agar tidak terkirim dua kali) */
 button[aria-busy='true'],
@@ -558,3 +613,122 @@ button[aria-busy='true']::after {
 @keyframes kos-spin {
     to { transform: rotate(360deg); }
 }
+
+/* ------------------------------------------------------------------ */
+/* Ringkasan pengelola: buku kas bergaya struk & denah pintu kamar     */
+/* ------------------------------------------------------------------ */
+.ledger-dots {
+    flex: 1;
+    min-width: 1rem;
+    border-bottom: 2px dotted var(--color-line);
+    transform: translateY(-.3em);
+}
+/* Tepi atas bergerigi seperti sobekan struk (satu gradient, tanpa gambar) */
+.ledger::before {
+    content: '';
+    position: absolute;
+    left: 1.25rem;
+    right: 1.25rem;
+    top: -1px;
+    height: 7px;
+    background: radial-gradient(circle at 6px -1px, var(--color-canvas) 5px, transparent 5.5px) 0 0 / 12px 7px repeat-x;
+}
+.room-hatch {
+    background: repeating-linear-gradient(-45deg, var(--color-canvas) 0 6px, color-mix(in srgb, var(--color-line) 70%, transparent) 6px 8px);
+}
+.room-door {
+    transition: transform .18s cubic-bezier(.2,.7,.2,1), box-shadow .18s ease;
+}
+.room-door:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 18px -10px rgb(23 33 31 / .35);
+}
+.room-door:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+/* ------------------------------------------------------------------ */
+/* Bilah bawah HP pengelola                                           */
+/* ------------------------------------------------------------------ */
+.tab-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .125rem;
+    height: 3.75rem;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-ink-soft);
+}
+.tab-item.is-on { color: var(--color-brand); }
+.tab-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 1.875rem;
+    border-radius: 999px;
+    transition: background-color .2s ease;
+}
+.tab-item.is-on .tab-icon { background: var(--color-brand-wash); }
+.tab-badge {
+    position: absolute;
+    top: -.3rem;
+    right: .1rem;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 .25rem;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    box-shadow: 0 0 0 2px var(--color-surface);
+}
+/* Tombol "Baru" menonjol di tengah, menembus garis bilah */
+.tab-fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    margin-bottom: .75rem;
+    border-radius: 1.25rem;
+    color: #fff;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--color-brand) 80%, white), var(--color-brand-deep));
+    box-shadow: 0 0 0 4px var(--color-surface), 0 10px 20px -8px color-mix(in srgb, var(--color-brand) 70%, transparent);
+    transition: transform .15s ease;
+}
+.tab-fab:active { transform: scale(.94); }
+.tab-fab:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+
+@media (max-width: 639px) {
+    .page-band { padding: .875rem 1rem; border-radius: 1.25rem; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Rencana Belanja: kartu hasil machine learning                       */
+/* ------------------------------------------------------------------ */
+.ml-hero {
+    background:
+        linear-gradient(rgb(255 255 255 / .035) 1px, transparent 1px) 0 0 / 26px 26px,
+        linear-gradient(90deg, rgb(255 255 255 / .035) 1px, transparent 1px) 0 0 / 26px 26px,
+        radial-gradient(26rem 16rem at 100% 0%, rgb(201 138 43 / .28), transparent 70%),
+        linear-gradient(150deg, #00564f, #002b26);
+}
+/* Arsiran = angka hasil prediksi (bukan data nyata) */
+.forecast-hatch {
+    background: repeating-linear-gradient(-45deg, var(--c) 0 4px, color-mix(in srgb, var(--c) 40%, transparent) 4px 7px);
+}
+.ml-spark { animation: ml-twinkle 2.4s ease-in-out infinite; }
+.ml-forecast { animation: ml-flow 1.2s linear infinite; }
+.ml-dot { transform-box: fill-box; transform-origin: center; animation: ml-pulse 2s ease-in-out infinite; }
+.ml-grow { transform-origin: left center; animation: ml-grow .9s cubic-bezier(.2,.7,.2,1) backwards .2s; }
+@keyframes ml-twinkle { 50% { opacity: .45; transform: scale(.85) rotate(20deg); } }
+@keyframes ml-flow { to { stroke-dashoffset: -14; } }
+@keyframes ml-pulse { 50% { transform: scale(1.6); opacity: .55; } }
+@keyframes ml-grow { from { transform: scaleX(0); } }
+
+/* Baris chip yang bisa digeser tanpa bilah gulir (kelas ini dipakai di beberapa halaman) */
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

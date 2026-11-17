@@ -30,15 +30,28 @@
 
     <!-- Full-Width Adaptive Layout Container -->
     <div class="min-h-screen flex flex-col relative">
-        
+
         <!-- ============================================================== -->
         <!-- TOP APP BAR (Sticky, Max-w-7xl, Full Width Adaptive) -->
         <!-- ============================================================== -->
-        <header class="app-bar sticky top-0 z-40 rounded-b-[1.75rem] shadow-md">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 w-full flex items-center justify-between">
+        @php
+            $isPetugas = Auth::user() && Auth::user()->isPetugas();
+            $petugasActiveCount = $isPetugas
+                ? \App\Models\Order::whereIn('status', ['menunggu', 'diproses', 'diantar'])->count()
+                : 0;
+            // Barang di bawah batas minimum: ditampilkan di menu Stok agar petugas tahu ada yang perlu dibeli.
+            $petugasLowStock = $isPetugas
+                ? \App\Models\CatalogItem::whereColumn('stock', '<=', 'minimum_stock')->count()
+                : 0;
+        @endphp
+        <!-- Header petugas mengecil saat digulir agar ruang kerja di HP lebih lega -->
+        <header class="app-bar sticky top-0 z-40 rounded-b-[1.75rem] shadow-md"
+                @if($isPetugas) x-data="{ scrolled: false }" @scroll.window.passive="scrolled = window.scrollY > 40" @endif>
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 w-full flex items-center justify-between transition-[padding] duration-200"
+                 @if($isPetugas) :class="scrolled && '!py-2'" @endif>
                 <!-- Brand & Room Pill -->
                 <div class="flex items-center space-x-3">
-                    <a href="{{ Auth::user()->isPetugas() ? route('petugas.antrean') : route('penghuni.beranda') }}" 
+                    <a href="{{ Auth::user()->isPetugas() ? route('petugas.antrean') : route('penghuni.beranda') }}"
                        class="w-10 h-10 rounded-xl bg-white text-brand-deep flex items-center justify-center font-bold text-sm shadow-md flex-shrink-0 transition-transform hover:scale-105" aria-label="Kos Tiana Putra, ke beranda">
                         KT
                     </a>
@@ -47,39 +60,46 @@
                         <p class="mt-0.5 flex items-center gap-1.5 text-xs text-white/90 font-medium whitespace-nowrap">
                             @if(Auth::user() && Auth::user()->isPenghuni() && Auth::user()->tenantProfile && Auth::user()->tenantProfile->room)
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold bg-white text-brand-deep tabular-nums">{{ Auth::user()->tenantProfile->room->room_number }}</span>
-                            @elseif(Auth::user() && Auth::user()->isPetugas())
+                            @elseif($isPetugas)
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold bg-white/20 text-white">Petugas</span>
                             @endif
-                            <span class="truncate hidden min-[400px]:inline">@yield('header_subtitle', 'Layanan Kos')</span>
+                            @if($isPetugas)
+                                <a href="{{ route('petugas.antrean') }}" class="inline-flex items-center gap-1.5 truncate hover:text-white">
+                                    @if($petugasActiveCount > 0)
+                                        <span class="relative flex h-2 w-2"><span class="absolute inset-0 rounded-full bg-ochre motion-safe:animate-ping opacity-60"></span><span class="relative h-2 w-2 rounded-full bg-ochre"></span></span>
+                                        {{ $petugasActiveCount }} antrean aktif
+                                    @else
+                                        <span class="h-2 w-2 rounded-full bg-white/50"></span>
+                                        Antrean kosong
+                                    @endif
+                                </a>
+                            @else
+                                <span class="truncate hidden min-[400px]:inline">@yield('header_subtitle', 'Layanan Kos')</span>
+                            @endif
                         </p>
                     </div>
                 </div>
 
-                @php
-                    $petugasActiveCount = (Auth::user() && Auth::user()->isPetugas()) 
-                        ? \App\Models\Order::whereIn('status', ['menunggu', 'diproses', 'diantar'])->count() 
-                        : 0;
-                @endphp
 
                 <!-- Desktop Horizontal Navigation Links (Only on >= md, strictly whitespace-nowrap) -->
                 @if(Auth::user() && Auth::user()->isPenghuni())
                     <nav class="hidden md:flex items-center gap-1.5 whitespace-nowrap">
-                        <a href="{{ route('penghuni.beranda') }}" 
+                        <a href="{{ route('penghuni.beranda') }}"
                            @if(request()->routeIs('penghuni.beranda')) aria-current="page" @endif
                            class="px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors {{ request()->routeIs('penghuni.beranda') ? 'bg-white text-brand-deep font-bold shadow-sm' : 'text-white/90 hover:text-white hover:bg-white/15 font-medium' }}">
                             Beranda
                         </a>
-                        <a href="{{ route('penghuni.katalog') }}" 
+                        <a href="{{ route('penghuni.katalog') }}"
                            @if(request()->routeIs('penghuni.katalog*') || request()->routeIs('penghuni.menu*')) aria-current="page" @endif
                            class="px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors {{ request()->routeIs('penghuni.katalog*') || request()->routeIs('penghuni.menu*') ? 'bg-white text-brand-deep font-bold shadow-sm' : 'text-white/90 hover:text-white hover:bg-white/15 font-medium' }}">
                             Pesan Menu
                         </a>
-                        <a href="{{ route('penghuni.pesanan') }}" 
+                        <a href="{{ route('penghuni.pesanan') }}"
                            @if(request()->routeIs('penghuni.pesanan*')) aria-current="page" @endif
                            class="px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors {{ request()->routeIs('penghuni.pesanan*') ? 'bg-white text-brand-deep font-bold shadow-sm' : 'text-white/90 hover:text-white hover:bg-white/15 font-medium' }}">
                             Pesanan Saya
                         </a>
-                        <a href="{{ route('penghuni.tagihan') }}" 
+                        <a href="{{ route('penghuni.tagihan') }}"
                            @if(request()->routeIs('penghuni.tagihan*')) aria-current="page" @endif
                            class="px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors {{ request()->routeIs('penghuni.tagihan*') ? 'bg-white text-brand-deep font-bold shadow-sm' : 'text-white/90 hover:text-white hover:bg-white/15 font-medium' }}">
                             Tagihan Sewa
@@ -87,7 +107,7 @@
                     </nav>
                 @elseif(Auth::user() && Auth::user()->isPetugas())
                     <nav class="hidden md:flex items-center gap-1.5 whitespace-nowrap">
-                        <a href="{{ route('petugas.dashboard') }}" 
+                        <a href="{{ route('petugas.dashboard') }}"
                            @if(request()->routeIs('petugas.dashboard') || request()->routeIs('petugas.antrean')) aria-current="page" @endif
                            class="px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 {{ request()->routeIs('petugas.dashboard') || request()->routeIs('petugas.antrean') ? 'bg-white text-brand-deep font-bold shadow-sm' : 'text-white/90 hover:text-white hover:bg-white/15 font-medium' }}">
                             <span>Antrean</span>
@@ -97,12 +117,15 @@
                                 </span>
                             @endif
                         </a>
-                        <a href="{{ route('petugas.stocks.index') }}" 
+                        <a href="{{ route('petugas.stocks.index') }}"
                            @if(request()->routeIs('petugas.stocks*') || request()->routeIs('petugas.stok')) aria-current="page" @endif
-                           class="px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors {{ request()->routeIs('petugas.stocks*') || request()->routeIs('petugas.stok') ? 'bg-white text-brand-deep font-bold shadow-sm' : 'text-white/90 hover:text-white hover:bg-white/15 font-medium' }}">
-                            Stok
+                           class="px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 {{ request()->routeIs('petugas.stocks*') || request()->routeIs('petugas.stok') ? 'bg-white text-brand-deep font-bold shadow-sm' : 'text-white/90 hover:text-white hover:bg-white/15 font-medium' }}">
+                            <span>Stok</span>
+                            @if($petugasLowStock > 0)
+                                <span class="px-1.5 rounded-full text-2xs font-bold tabular-nums bg-ochre text-ink" title="{{ $petugasLowStock }} barang menipis">{{ $petugasLowStock }}</span>
+                            @endif
                         </a>
-                        <a href="{{ route('petugas.history') }}" 
+                        <a href="{{ route('petugas.history') }}"
                            @if(request()->routeIs('petugas.history*') || request()->routeIs('petugas.riwayat')) aria-current="page" @endif
                            class="px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors {{ request()->routeIs('petugas.history*') || request()->routeIs('petugas.riwayat') ? 'bg-white text-brand-deep font-bold shadow-sm' : 'text-white/90 hover:text-white hover:bg-white/15 font-medium' }}">
                             Riwayat
@@ -118,39 +141,38 @@
                         // Hanya 8 terbaru dari database (sebelumnya seluruh riwayat notifikasi dimuat lalu dipotong di PHP)
                         $recentNotifications = Auth::user() ? Auth::user()->appNotifications()->limit(8)->get() : collect();
                     @endphp
-                    <div class="relative" x-data="{ 
-                        notifOpen: false, 
+                    <div class="relative" x-data="{
+                        notifOpen: false,
                         unreadCount: {{ $unreadCount }}
                     }">
-                        <button type="button" @click="notifOpen = !notifOpen" 
+                        <button type="button" @click="notifOpen = !notifOpen"
                                 class="relative p-2.5 text-white hover:bg-white/15 rounded-xl transition-colors"
                                 title="Notifikasi" aria-label="Notifikasi" aria-haspopup="true" :aria-expanded="notifOpen">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                             </svg>
-                            <span x-show="unreadCount > 0" 
-                                  x-cloak
-                                  class="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-ochre rounded-full ring-2 ring-brand animate-pulse"></span>
+                            <span x-show="unreadCount > 0" x-cloak x-text="unreadCount > 9 ? '9+' : unreadCount"
+                                  class="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-ochre text-ink text-[10px] font-bold leading-[18px] text-center ring-2 ring-brand-deep"></span>
                         </button>
 
                         <!-- Notification Menu -->
-                        <div x-show="notifOpen" 
-                             @click.away="notifOpen = false" 
+                        <div x-show="notifOpen"
+                             @click.away="notifOpen = false"
                              x-cloak
                              class="absolute right-0 mt-2 w-80 sm:w-96 bg-surface rounded-2xl shadow-xl border border-line py-2 z-50">
                             <div class="px-4 py-2.5 border-b border-line flex items-center justify-between">
                                 <div class="flex items-center space-x-2">
                                     <span class="font-bold text-xs text-ink uppercase tracking-wider">Notifikasi</span>
-                                    <span x-show="unreadCount > 0" 
+                                    <span x-show="unreadCount > 0"
                                           x-text="unreadCount + ' Baru'"
                                           class="text-2xs font-semibold text-brand bg-brand-wash px-2 py-0.5 rounded-full border border-line">
                                     </span>
-                                    <span x-show="unreadCount === 0" 
+                                    <span x-show="unreadCount === 0"
                                           class="text-2xs font-semibold text-ink-soft bg-canvas px-2 py-0.5 rounded-full border border-line">
                                         Semua Terbaca
                                     </span>
                                 </div>
-                                <button type="button" 
+                                <button type="button"
                                         x-show="unreadCount > 0"
                                         @click="
                                             fetch('{{ route('notifications.read_all') }}', {
@@ -194,7 +216,7 @@
                                               :class="!isRead ? 'bg-brand ring-2 ring-brand-wash' : 'bg-line'"></span>
                                         <div class="flex-1 min-w-0">
                                             <div class="flex items-center justify-between gap-1">
-                                                <p class="text-xs font-bold leading-snug truncate" 
+                                                <p class="text-xs font-bold leading-snug truncate"
                                                    :class="!isRead ? 'text-ink font-bold' : 'text-ink-soft'">
                                                     {{ $n->title }}
                                                 </p>
@@ -226,14 +248,14 @@
                     </div>
 
                     <!-- Profile & Role Switcher Dropdown -->
-                    <div class="relative">
+                    <div class="relative {{ $isPetugas ? 'hidden md:block' : '' }}">
                         <button type="button" @click="userMenu = !userMenu" aria-label="Menu akun" aria-haspopup="true" :aria-expanded="userMenu"
                                 class="w-10 h-10 rounded-full bg-white text-brand-deep font-bold flex items-center justify-center text-sm hover:ring-4 hover:ring-white/30 transition-all shadow-sm">
                             {{ substr(Auth::user()->name ?? 'U', 0, 1) }}
                         </button>
 
-                        <div x-show="userMenu" 
-                             @click.away="userMenu = false" 
+                        <div x-show="userMenu"
+                             @click.away="userMenu = false"
                              x-cloak
                              class="absolute right-0 mt-2 w-60 bg-surface rounded-2xl shadow-xl border border-line py-2 z-50">
                             <div class="px-4 py-2.5 border-b border-line">
@@ -286,12 +308,12 @@
         <!-- FIXED BOTTOM NAVIGATION BAR (Mobile Only: STRICTLY md:hidden) -->
         <!-- ============================================================== -->
         <nav aria-label="Navigasi utama" class="fixed bottom-0 inset-x-0 z-40 bg-surface/95 backdrop-blur-md border-t border-line shadow-[0_-4px_16px_rgb(23_33_31/0.08)] md:hidden pb-[env(safe-area-inset-bottom,0px)]">
-            <div class="max-w-lg mx-auto grid {{ (Auth::user() && Auth::user()->isPetugas()) ? 'grid-cols-3' : 'grid-cols-4' }} items-stretch px-2">
-                
+            <div class="max-w-lg mx-auto grid grid-cols-4 items-stretch px-2">
+
                 @if(Auth::user() && Auth::user()->isPetugas())
                     <!-- ================= PETUGAS NAVIGATION (3 Menu Utama) ================= -->
                     <!-- 1. Antrean Tugas -->
-                    <a href="{{ route('petugas.dashboard') }}" 
+                    <a href="{{ route('petugas.dashboard') }}"
                        class="bn-link" @if(request()->routeIs('petugas.dashboard*') || request()->routeIs('petugas.antrean*')) aria-current="page" @endif>
                         <div class="bn-icon relative">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -307,18 +329,23 @@
                     </a>
 
                     <!-- 2. Stok Galon & Menu -->
-                    <a href="{{ route('petugas.stocks.index') }}" 
+                    <a href="{{ route('petugas.stocks.index') }}"
                        class="bn-link" @if(request()->routeIs('petugas.stocks*') || request()->routeIs('petugas.stok*')) aria-current="page" @endif>
                         <div class="bn-icon relative">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                             </svg>
+                            @if($petugasLowStock > 0)
+                                <span class="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 bg-ochre text-ink text-2xs font-bold rounded-full flex items-center justify-center tabular-nums shadow-xs">
+                                    {{ $petugasLowStock }}<span class="sr-only"> barang menipis</span>
+                                </span>
+                            @endif
                         </div>
                         <span class="whitespace-nowrap">Stok</span>
                     </a>
 
                     <!-- 3. Riwayat Selesai -->
-                    <a href="{{ route('petugas.history') }}" 
+                    <a href="{{ route('petugas.history') }}"
                        class="bn-link" @if(request()->routeIs('petugas.history*') || request()->routeIs('petugas.riwayat*')) aria-current="page" @endif>
                         <div class="bn-icon relative">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -328,10 +355,19 @@
                         <span class="whitespace-nowrap">Riwayat</span>
                     </a>
 
+                    <!-- 4. Akun: profil, kata sandi, keluar (terjangkau jempol) -->
+                    <a href="{{ route('petugas.profil') }}"
+                       class="bn-link" @if(request()->routeIs('petugas.profil')) aria-current="page" @endif>
+                        <div class="bn-icon relative">
+                            <span class="w-7 h-7 rounded-full border-2 border-current flex items-center justify-center text-xs font-bold">{{ mb_substr(Auth::user()->name ?? 'P', 0, 1) }}</span>
+                        </div>
+                        <span class="whitespace-nowrap">Akun</span>
+                    </a>
+
                 @else
                     <!-- ================= PENGHUNI NAVIGATION (4 Menu Utama) ================= -->
                     <!-- 1. Beranda -->
-                    <a href="{{ route('penghuni.beranda') }}" 
+                    <a href="{{ route('penghuni.beranda') }}"
                        class="bn-link" @if(request()->routeIs('penghuni.beranda')) aria-current="page" @endif>
                         <div class="bn-icon relative">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -342,7 +378,7 @@
                     </a>
 
                     <!-- 2. Pesan Menu -->
-                    <a href="{{ route('penghuni.katalog') }}" 
+                    <a href="{{ route('penghuni.katalog') }}"
                        class="bn-link" @if(request()->routeIs('penghuni.katalog*') || request()->routeIs('penghuni.menu*')) aria-current="page" @endif>
                         <div class="bn-icon relative">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -353,7 +389,7 @@
                     </a>
 
                     <!-- 3. Pesanan Saya -->
-                    <a href="{{ route('penghuni.pesanan') }}" 
+                    <a href="{{ route('penghuni.pesanan') }}"
                        class="bn-link" @if(request()->routeIs('penghuni.pesanan*')) aria-current="page" @endif>
                         <div class="bn-icon relative">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -364,7 +400,7 @@
                     </a>
 
                     <!-- 4. Tagihan Sewa -->
-                    <a href="{{ route('penghuni.tagihan') }}" 
+                    <a href="{{ route('penghuni.tagihan') }}"
                        class="bn-link" @if(request()->routeIs('penghuni.tagihan*')) aria-current="page" @endif>
                         <div class="bn-icon relative">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

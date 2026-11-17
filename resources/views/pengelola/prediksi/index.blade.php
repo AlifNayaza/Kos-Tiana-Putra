@@ -1,1036 +1,417 @@
 @extends('layouts.app')
 
-@section('page_title', 'Rekomendasi Belanja & Prediksi Stok')
-@section('page_subtitle', 'Perkiraan kebutuhan galon dan bahan warkop untuk 7 hari ke depan berdasarkan kebiasaan pesanan penghuni kos')
+@section('page_title', 'Rencana Belanja')
+@section('page_subtitle', 'Saran belanja kios 7 hari ke depan dari prediksi machine learning')
+@section('no_page_band', '1')
 
 @section('content')
+@php
+    $rp = fn ($v) => 'Rp ' . number_format((int) $v, 0, ',', '.');
+    $updatedAt = $lastCalculatedAt ? \Carbon\Carbon::parse($lastCalculatedAt) : null;
+    $needCount = $shoppingChecklist->count();
+
+    // ---- Grafik mini: 30 hari data yang dipelajari model + garis prediksi 7 hari ke depan ----
+    $hist = $mlInfo['history']->all();
+    $fc = (float) $mlInfo['forecast_daily'];
+    $W = 360; $H = 84; $pad = 6;
+    $histW = $W * 30 / 37;                       // 30 hari riwayat, 7 hari prediksi
+    $step = $histW / 29;
+    $max = max(max($hist ?: [0]), $fc * 1.35, 1);
+    $y = fn ($v) => round($H - $pad - ($v / $max) * ($H - 2 * $pad), 1);
+    $points = collect($hist)->map(fn ($v, $i) => round($i * $step, 1) . ',' . $y($v))->join(' ');
+    $lastX = round(29 * $step, 1);
+    $lastY = $y(end($hist) ?: 0);
+    $fcY = $y($fc);
+    $band = $fc * (($mlInfo['accuracy'] !== null ? (100 - $mlInfo['accuracy']) : 35) / 100);
+    $bandTop = $y($fc + $band);
+    $bandBot = $y(max(0, $fc - $band));
+    $area = "0,{$H} {$points} {$lastX},{$H}";
+
+    $statusStyle = [
+        'kritis'  => ['label' => 'Mendesak',       'pill' => 'bg-alert-wash text-alert',  'c' => 'var(--color-alert)'],
+        'waspada' => ['label' => 'Perlu ditambah', 'pill' => 'bg-wait-wash text-wait',   'c' => 'var(--color-wait)'],
+        'aman'    => ['label' => 'Aman',           'pill' => 'bg-done-wash text-done',    'c' => 'var(--color-done)'],
+    ];
+    $trend = [
+        'naik'   => ['↗ makin laris', 'text-done'],
+        'turun'  => ['↘ mulai sepi', 'text-ink-soft'],
+        'stabil' => ['→ stabil', 'text-ink-soft'],
+    ];
+    $restockPayload = fn ($p) => [
+        'prediction_id' => $p->id,
+        'name' => $p->catalogItem?->name,
+        'unit' => $p->catalogItem?->unit,
+        'current_stock' => $p->current_stock,
+        'restock_qty' => $p->recommended_restock_qty,
+    ];
+@endphp
+
 <div class="space-y-6" x-data="{
     isRunning: {{ $isCalculating ? 'true' : 'false' }},
-    guideModalOpen: false,
-    guideTab: 'owner',
     restockModalOpen: false,
     selectedItem: null,
     restockQty: 1,
     restockNotes: '',
     restockActionUrl: '',
-    activeFilter: 'semua',
-    searchQuery: '',
+    filter: 'semua',
+    showAll: false,
     copiedWa: false,
-
     openRestock(item) {
         this.selectedItem = item;
         this.restockQty = item.restock_qty > 0 ? item.restock_qty : 10;
-        this.restockNotes = 'Belanja pasokan kos';
+        this.restockNotes = 'Belanja sesuai prediksi';
         this.restockActionUrl = '{{ url('/pengelola/prediksi-stok/restock') }}/' + item.prediction_id;
         this.restockModalOpen = true;
     },
-
     copyWaList() {
-        const text = document.getElementById('waShoppingText').value;
-        navigator.clipboard.writeText(text);
+        navigator.clipboard.writeText(document.getElementById('waShoppingText').value);
         this.copiedWa = true;
         setTimeout(() => this.copiedWa = false, 2500);
-    },
-
-    matchesFilter(item) {
-        if (this.searchQuery && !item.name.toLowerCase().includes(this.searchQuery.toLowerCase())) {
-            return false;
-        }
-        if (this.activeFilter === 'semua') return true;
-        if (this.activeFilter === 'restock') return item.restock_qty > 0;
-        if (this.activeFilter === 'kritis') return item.status === 'kritis';
-        if (this.activeFilter === 'waspada') return item.status === 'waspada';
-        if (this.activeFilter === 'galon') return item.category === 'galon';
-        if (this.activeFilter === 'makanan') return item.category === 'makanan';
-        if (this.activeFilter === 'minuman') return item.category === 'minuman';
-        return true;
     }
 }">
-
-    <!-- Hidden textarea for WhatsApp Text Copying -->
     <textarea id="waShoppingText" aria-label="Teks daftar belanja untuk WhatsApp" class="sr-only" readonly>{{ $waShoppingText }}</textarea>
 
     <!-- ============================================================== -->
-    <!-- 1. HEADER BAR & PENGATURAN KEBUTUHAN -->
+    <!-- 1. KARTU UTAMA: HASIL PREDIKSI MACHINE LEARNING                -->
     <!-- ============================================================== -->
-    <div class="bg-surface p-5 sm:p-6 rounded-2xl border border-line shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-            <div class="flex flex-wrap items-center gap-2">
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-2xs font-bold bg-brand-wash text-brand border border-brand/20">
-                    Analisis Otomatis 30 Hari Terakhir
-                </span>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-2xs font-semibold bg-canvas text-ink-soft border border-line">
-                    Kebutuhan 7 Hari ke Depan
-                </span>
-            </div>
+    <section aria-labelledby="ml-title" class="ml-hero nav-tiles relative overflow-hidden rounded-3xl text-white p-4 sm:p-7">
+        <div class="relative grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,25rem)] gap-4 sm:gap-6 lg:gap-8">
+            <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="ml-badge inline-flex items-center gap-1.5 rounded-full bg-ochre px-2.5 py-1 text-[11px] font-bold text-ink">
+                        <svg class="ml-spark w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9L12 2zm7 11l.9 2.6 2.6.9-2.6.9L19 20l-.9-2.6-2.6-.9 2.6-.9L19 13z"/></svg>
+                        Prediksi Machine Learning
+                    </span>
+                    <span class="text-xs text-white/70">
+                        @if($isCalculating)
+                            Sedang dihitung di latar belakang... muat ulang halaman beberapa saat lagi.
+                        @elseif($updatedAt)
+                            Diperbarui {{ $updatedAt->diffForHumans() }}
+                        @else
+                            Belum pernah dihitung
+                        @endif
+                    </span>
+                </div>
 
-            <h2 class="text-lg sm:text-xl font-extrabold text-ink mt-2">
-                Rencana Belanja & Persediaan Kos
-            </h2>
-
-            <p class="text-xs text-ink-soft mt-1 flex items-center space-x-1.5">
-                <svg class="w-3.5 h-3.5 text-ink-faint flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <span>
-                    @if($lastCalculatedAt)
-                        Terakhir dianalisis: <strong class="text-ink font-bold">{{ \Carbon\Carbon::parse($lastCalculatedAt)->translatedFormat('d F Y, H:i') }} WIB</strong> 
-                        <span class="text-brand font-semibold">({{ \Carbon\Carbon::parse($lastCalculatedAt)->diffForHumans() }})</span>
+                <h1 id="ml-title" class="mt-3 font-display text-[1.45rem] sm:text-4xl font-bold leading-tight tracking-tight">
+                    @if($needCount > 0)
+                        Minggu ini belanja <span class="text-ochre">{{ $needCount }} barang</span>
                     @else
-                        Belum pernah dianalisis
+                        Persediaan aman untuk 7 hari ke depan
                     @endif
-                </span>
-            </p>
-            @if($isCalculating)
-                <p class="text-xs text-brand font-semibold mt-1.5">Sedang dihitung di latar belakang... muat ulang halaman beberapa saat lagi.</p>
-            @elseif($lastError)
-                <p class="text-xs text-alert mt-1.5">Perhitungan terakhir gagal: {{ $lastError }}</p>
-            @endif
-        </div>
-
-        <div class="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-            <!-- Tombol Modal Panduan (Sangat ramah pengguna) -->
-            <button type="button" 
-                    @click="guideModalOpen = true"
-                    class="h-10 px-3.5 rounded-xl border border-line bg-canvas hover:bg-line/50 text-ink text-xs font-bold transition-colors flex items-center space-x-1.5 shadow-2xs">
-                <svg class="w-4 h-4 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <span>Panduan Membaca Prediksi</span>
-            </button>
-
-            <!-- Tombol Hitung Ulang Kebutuhan -->
-            <form action="{{ route('pengelola.prediksi.calculate') }}" method="POST" @submit="isRunning = true">
-                @csrf
-                <button type="submit" 
-                        :disabled="isRunning"
-                        class="h-10 px-4 rounded-xl bg-brand hover:bg-brand-deep disabled:opacity-50 text-surface text-xs font-bold shadow-xs transition-all flex items-center space-x-2">
-                    <template x-if="!isRunning">
-                        <div class="flex items-center space-x-1.5">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                            </svg>
-                            <span>Perbarui Hitungan Kebutuhan</span>
-                        </div>
-                    </template>
-                    <template x-if="isRunning">
-                        <div class="flex items-center space-x-2">
-                            <svg class="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                            </svg>
-                            <span>Menganalisis pesanan kos...</span>
-                        </div>
-                    </template>
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- ============================================================== -->
-    <!-- 2. 4 KARTU RINGKASAN EKSEKUTIF -->
-    <!-- ============================================================== -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        <!-- KPI 1: Perlu Belanja Segera -->
-        <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex flex-col justify-between">
-            <div>
-                <div class="flex items-center justify-between">
-                    <span class="text-2xs font-bold text-ink-soft uppercase tracking-wider">Perlu Belanja</span>
-                    @if($stats['need_restock'] > 0)
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold bg-alert-wash text-alert border border-alert/20">
-                            Perlu Restock
-                        </span>
-                    @else
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold bg-done-wash text-done border border-done/20">
-                            Stok Aman
-                        </span>
-                    @endif
-                </div>
-
-                <div class="mt-3 flex items-baseline space-x-2">
-                    <span class="text-3xl font-extrabold {{ $stats['need_restock'] > 0 ? 'text-alert' : 'text-ink' }} tabular-nums">
-                        {{ $stats['need_restock'] }}
-                    </span>
-                    <span class="text-xs text-ink-soft font-medium">Barang</span>
-                </div>
-
-                <div class="mt-1 flex items-center space-x-2 text-xs">
-                    <span class="text-alert font-bold tabular-nums">{{ $stats['kritis'] }} Mendesak</span>
-                    <span class="text-ink-faint">&bull;</span>
-                    <span class="text-wait font-semibold tabular-nums">{{ $stats['waspada'] }} Perlu Ditambah</span>
-                </div>
-            </div>
-
-            <div class="mt-4 pt-3 border-t border-line flex items-center justify-between">
-                <button type="button" 
-                        @click="activeFilter = 'restock'"
-                        class="text-2xs font-bold text-brand hover:text-brand-deep transition-colors flex items-center space-x-1">
-                    <span>Lihat {{ $stats['need_restock'] }} barang ini &rarr;</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- KPI 2: Estimasi Modal Belanja Minggu Ini -->
-        <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex flex-col justify-between">
-            <div>
-                <div class="flex items-center justify-between">
-                    <span class="text-2xs font-bold text-ink-soft uppercase tracking-wider">Estimasi Uang Belanja</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold bg-brand-wash text-brand border border-brand/20">
-                        7 Hari
-                    </span>
-                </div>
-
-                <div class="mt-3">
-                    <span class="text-2xl sm:text-[26px] font-extrabold text-brand tabular-nums tracking-tight block">
-                        Rp {{ number_format($stats['estimated_budget'], 0, ',', '.') }}
-                    </span>
-                    <p class="text-2xs text-ink-faint mt-1 font-medium">Perkiraan dana belanja untuk membeli seluruh saran restock</p>
-                </div>
-            </div>
-
-            <div class="mt-4 pt-3 border-t border-line flex items-center justify-between text-2xs text-ink-soft">
-                <span>Rata-rata modal per barang:</span>
-                <span class="font-bold text-ink tabular-nums">
-                    Rp {{ $stats['need_restock'] > 0 ? number_format($stats['estimated_budget'] / $stats['need_restock'], 0, ',', '.') : '0' }}
-                </span>
-            </div>
-        </div>
-
-        <!-- KPI 3: Kebutuhan Galon 7 Hari ke Depan -->
-        <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex flex-col justify-between">
-            <div>
-                <div class="flex items-center justify-between">
-                    <span class="text-2xs font-bold text-ink-soft uppercase tracking-wider">Kebutuhan Galon (7 Hari)</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold bg-brand-wash text-brand border border-brand/20">
-                        Aqua &bull; Le Min &bull; RO
-                    </span>
-                </div>
-
-                <div class="mt-3 flex items-baseline space-x-2">
-                    <span class="text-3xl font-extrabold text-ink tabular-nums">
-                        {{ $stats['galon_demand'] }}
-                    </span>
-                    <span class="text-xs text-ink-soft font-medium">Galon Air</span>
-                </div>
-
-                <p class="text-2xs text-ink-soft mt-1">
-                    Sisa di kos: <strong class="text-ink tabular-nums">{{ $stats['galon_stock'] }}</strong> &bull; 
-                    Saran pesan: <strong class="text-alert tabular-nums">+{{ $stats['galon_restock'] }} galon</strong>
-                </p>
-            </div>
-
-            <div class="mt-4 pt-3 border-t border-line flex items-center justify-between">
-                <button type="button" 
-                        @click="activeFilter = 'galon'"
-                        class="text-2xs font-bold text-brand hover:text-brand-deep transition-colors">
-                    Lihat khusus galon &rarr;
-                </button>
-            </div>
-        </div>
-
-        <!-- KPI 4: Status Stok Aman -->
-        <div class="bg-surface p-5 rounded-2xl border border-line shadow-xs flex flex-col justify-between">
-            <div>
-                <div class="flex items-center justify-between">
-                    <span class="text-2xs font-bold text-ink-soft uppercase tracking-wider">Persediaan Masih Cukup</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-bold bg-done-wash text-done border border-done/20">
-                        Aman
-                    </span>
-                </div>
-
-                <div class="mt-3 flex items-baseline space-x-2">
-                    <span class="text-3xl font-extrabold text-done tabular-nums">
-                        {{ $stats['aman'] }}
-                    </span>
-                    <span class="text-xs text-ink-soft font-medium">dari {{ $stats['total'] }} Barang</span>
-                </div>
-
-                <p class="text-2xs text-ink-faint mt-1">
-                    Stok mencukupi untuk 1&ndash;2 minggu ke depan
-                </p>
-            </div>
-
-            <div class="mt-4 pt-3 border-t border-line flex items-center justify-between text-2xs">
-                <span class="text-ink-soft">Kesiapan persediaan:</span>
-                <span class="font-extrabold text-done tabular-nums">
-                    {{ round(($stats['aman'] / max(1, $stats['total'])) * 100) }}% Cukup
-                </span>
-            </div>
-        </div>
-
-    </div>
-
-    <!-- ============================================================== -->
-    <!-- 3. SECTION VISUAL: GRAFIK KOMPARASI & DAFTAR BELANJA SIAP PAKAI -->
-    <!-- ============================================================== -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        <!-- KOLOM KIRI (lg:col-span-7): GRAFIK KOMPARASI RAMAH -->
-        <div class="lg:col-span-7 bg-surface p-5 sm:p-6 rounded-2xl border border-line shadow-xs space-y-4">
-            <div class="border-b border-line pb-3">
-                <h3 class="text-sm font-bold text-ink">
-                    Bandingkan: Stok yang Ada vs Kebutuhan 7 Hari
-                </h3>
-                <p class="text-xs text-ink-soft mt-1 leading-relaxed">
-                    <strong class="text-ink">Cara membaca:</strong> Batang abu-abu adalah stok barang di kos saat ini. Batang berwarna adalah target kebutuhan 7 hari ke depan. Jika batang abu-abu lebih pendek dari target warna, barang tersebut perlu segera dibeli.
-                </p>
-            </div>
-
-            <!-- Legend Info yang Ramah -->
-            <div class="flex flex-wrap items-center gap-4 text-xs">
-                <div class="flex items-center space-x-1.5">
-                    <span class="w-3 h-3 rounded-xs bg-[#8a9892] inline-block"></span>
-                    <span class="text-ink-soft font-medium">Stok Ada di Kos</span>
-                </div>
-                <div class="flex items-center space-x-1.5">
-                    <span class="w-3 h-3 rounded-xs bg-alert inline-block"></span>
-                    <span class="text-ink-soft font-medium">Mendesak (Habis dlm 1-2 hari)</span>
-                </div>
-                <div class="flex items-center space-x-1.5">
-                    <span class="w-3 h-3 rounded-xs bg-wait inline-block"></span>
-                    <span class="text-ink-soft font-medium">Perlu Ditambah (Untuk 7 hari)</span>
-                </div>
-                <div class="flex items-center space-x-1.5">
-                    <span class="w-3 h-3 rounded-xs bg-done inline-block"></span>
-                    <span class="text-ink-soft font-medium">Stok Cukup (Aman)</span>
-                </div>
-            </div>
-
-            <!-- Canvas Chart.js -->
-            <div class="relative h-96 w-full pt-2">
-                <canvas id="stockComparisonChart" role="img" aria-label="Grafik batang membandingkan stok di kos dengan kebutuhan tujuh hari untuk setiap barang"></canvas>
-            </div>
-        </div>
-
-        <!-- KOLOM KANAN (lg:col-span-5): DAFTAR BELANJA SIAP PAKAI -->
-        <div class="lg:col-span-5 bg-surface p-5 sm:p-6 rounded-2xl border border-line shadow-xs space-y-4">
-            <div class="flex items-start justify-between border-b border-line pb-3">
-                <div>
-                    <h3 class="text-sm font-bold text-ink">
-                        Daftar Belanja Siap Pakai
-                    </h3>
-                    <p class="text-xs text-ink-soft mt-0.5">
-                        Daftar barang yang perlu dibeli beserta perkiraan biayanya.
+                </h1>
+                @if($needCount > 0)
+                    <p class="mt-1 text-sm sm:text-base text-white/80">Perkiraan biaya <b class="text-white font-mono tabular-nums">{{ $rp($stats['estimated_budget']) }}</b>
+                        @if($stats['kritis'] > 0) · <span class="text-[#ffb4a3] font-semibold">{{ $stats['kritis'] }} mendesak</span>@endif
                     </p>
+                @endif
+                @if($lastError && !$isCalculating)
+                    <p class="mt-2 text-xs text-[#ffb4a3]">Perhitungan terakhir gagal: {{ $lastError }}</p>
+                @endif
+
+                <div class="mt-4 sm:mt-5 grid {{ $needCount > 0 ? 'grid-cols-[1fr_auto]' : 'grid-cols-1' }} gap-2 sm:flex sm:flex-wrap">
+                    @if($needCount > 0)
+                        <button type="button" @click="copyWaList()"
+                                class="h-11 inline-flex items-center justify-center gap-2 px-4 rounded-xl bg-surface text-brand-deep text-sm font-bold hover:bg-brand-wash transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"/></svg>
+                            <span x-text="copiedWa ? 'Tersalin, tempel di WhatsApp' : 'Salin daftar belanja'">Salin daftar belanja</span>
+                        </button>
+                    @endif
+                    <form action="{{ route('pengelola.prediksi.calculate') }}" method="POST" @submit="isRunning = true">
+                        @csrf
+                        <button type="submit" :disabled="isRunning" aria-label="Hitung ulang prediksi"
+                                class="h-11 w-full inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 rounded-xl bg-white/10 ring-1 ring-inset ring-white/25 text-sm font-semibold hover:bg-white/15 disabled:opacity-60 transition-colors">
+                            <svg class="w-4 h-4" :class="isRunning && 'animate-spin'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+                            <span class="{{ $needCount > 0 ? 'hidden sm:inline' : '' }}" x-text="isRunning ? 'Menghitung...' : 'Hitung ulang'">Hitung ulang</span>
+                        </button>
+                    </form>
                 </div>
-
-                <!-- Tombol Salin Format WhatsApp -->
-                <button type="button" 
-                        @click="copyWaList()"
-                        class="px-3 py-1.5 rounded-xl border border-brand bg-brand-wash hover:bg-brand-wash text-brand text-xs font-bold transition-all flex items-center space-x-1.5 shadow-2xs shrink-0">
-                    <span x-text="copiedWa ? '✓ Berhasil Disalin' : 'Salin ke WhatsApp'"></span>
-                </button>
             </div>
 
-            <!-- Daftar Item Belanja -->
-            <div class="divide-y divide-line max-h-[410px] overflow-y-auto pr-1 space-y-2.5">
-                @forelse($shoppingChecklist as $item)
-                    @php
-                        $catItem = $item->catalogItem;
-                        $daysSupply = $item->days_of_supply;
-                    @endphp
-                    <div class="pt-2.5 first:pt-0 pb-1 flex items-start justify-between gap-3 text-xs">
-                        <div class="space-y-1 min-w-0 flex-1">
-                            <div class="flex items-center space-x-1.5 flex-wrap">
-                                @if($item->status === 'kritis')
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-alert-wash text-alert border border-alert/20">
-                                        Mendesak
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-wait-wash text-wait border border-wait/20">
-                                        Perlu Ditambah
-                                    </span>
-                                @endif
-                                <span class="font-bold text-ink truncate">{{ $catItem?->name }}</span>
-                            </div>
-
-                            <p class="text-2xs text-ink-soft">
-                                Sisa di kos: <strong class="text-ink tabular-nums">{{ $item->current_stock }} {{ $catItem?->unit }}</strong> 
-                                <span class="text-ink-faint">({{ $daysSupply <= 2.5 ? 'habis dlm ~' . $daysSupply . ' hari' : 'cukup ~' . $daysSupply . ' hari' }})</span>
-                            </p>
-
-                            <p class="text-2xs font-semibold text-brand tabular-nums">
-                                Estimasi biaya: {{ $item->formatted_estimated_cost }}
-                            </p>
-                        </div>
-
-                        <div class="text-right flex flex-col items-end space-y-1.5 shrink-0">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-extrabold tabular-nums {{ $item->status === 'kritis' ? 'bg-alert-wash text-alert border border-alert/20' : 'bg-wait-wash text-wait border border-wait/20' }}">
-                                Beli +{{ $item->recommended_restock_qty }} {{ $catItem?->unit }}
-                            </span>
-
-                            <button type="button" 
-                                    @click="openRestock({
-                                        prediction_id: {{ $item->id }},
-                                        name: '{{ addslashes($catItem?->name) }}',
-                                        unit: '{{ $catItem?->unit }}',
-                                        current_stock: {{ $item->current_stock }},
-                                        target_stock: {{ $item->target_stock }},
-                                        restock_qty: {{ $item->recommended_restock_qty }},
-                                        price: {{ $catItem?->price ?? 0 }}
-                                    })"
-                                    class="px-2.5 py-1 rounded-lg bg-brand hover:bg-brand-deep text-surface font-bold text-2xs transition-colors shadow-2xs flex items-center space-x-1">
-                                <span>+ Catat Dibeli</span>
-                            </button>
-                        </div>
+            <!-- Grafik mini: data belajar (30 hari) + prediksi (7 hari) -->
+            <figure class="rounded-2xl bg-white/[.07] ring-1 ring-inset ring-white/10 p-3 sm:p-4">
+                <figcaption class="flex items-center justify-between gap-2 text-[11px] text-white/70">
+                    <span>Barang terjual per hari</span>
+                    <span class="flex items-center gap-3">
+                        <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-white rounded"></span>30 hari lalu</span>
+                        <span class="flex items-center gap-1"><span class="w-3 border-t-2 border-dotted border-ochre"></span>prediksi</span>
+                    </span>
+                </figcaption>
+                <svg viewBox="0 0 {{ $W }} {{ $H + 16 }}" class="mt-2 w-full h-auto" role="img"
+                     aria-label="Penjualan 30 hari terakhir dan prediksi rata-rata {{ $fc }} barang per hari untuk 7 hari ke depan">
+                    <polygon points="{{ $area }}" fill="rgb(255 255 255 / .08)"/>
+                    <polygon class="ml-band" points="{{ $lastX }},{{ $lastY }} {{ $W }},{{ $bandTop }} {{ $W }},{{ $bandBot }}" fill="rgb(201 138 43 / .22)"/>
+                    <polyline points="{{ $points }}" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+                    <line x1="{{ $lastX }}" y1="0" x2="{{ $lastX }}" y2="{{ $H }}" stroke="rgb(255 255 255 / .3)" stroke-dasharray="2 3"/>
+                    <polyline class="ml-forecast" points="{{ $lastX }},{{ $lastY }} {{ $W }},{{ $fcY }}" fill="none" stroke="#c98a2b" stroke-width="2.4" stroke-dasharray="3 4" stroke-linecap="round"/>
+                    <circle class="ml-dot" cx="{{ $W - 3 }}" cy="{{ $fcY }}" r="3.5" fill="#c98a2b"/>
+                    <text x="0" y="{{ $H + 13 }}" font-size="10" fill="rgb(255 255 255 / .6)">30 hari lalu</text>
+                    <text x="{{ $lastX }}" y="{{ $H + 13 }}" font-size="10" fill="rgb(255 255 255 / .85)" text-anchor="middle">hari ini</text>
+                    <text x="{{ $W }}" y="{{ $H + 13 }}" font-size="10" fill="#e0b46a" text-anchor="end">+7 hari</text>
+                </svg>
+                <dl class="mt-2 sm:mt-3 grid grid-cols-3 gap-1.5 sm:gap-2 text-center">
+                    <div class="rounded-xl bg-white/[.06] px-1 py-2">
+                        <dt class="text-[10.5px] text-white/65">Akurasi uji</dt>
+                        <dd class="mt-0.5 font-mono text-sm sm:text-base font-bold tabular-nums">{{ $mlInfo['accuracy'] !== null ? $mlInfo['accuracy'] . '%' : '—' }}</dd>
                     </div>
-                @empty
-                    <div class="p-8 text-center text-ink-faint space-y-2">
-                        <p class="font-bold text-done text-xs">Persediaan Kos Masih Aman!</p>
-                        <p class="text-2xs text-ink-soft">Tidak ada barang yang perlu dibeli untuk 7 hari ke depan.</p>
+                    <div class="rounded-xl bg-white/[.06] px-1 py-2">
+                        <dt class="text-[10.5px] text-white/65">Prediksi/hari</dt>
+                        <dd class="mt-0.5 font-mono text-sm sm:text-base font-bold tabular-nums">{{ rtrim(rtrim(number_format($fc, 1, ',', '.'), '0'), ',') }}</dd>
                     </div>
-                @endforelse
-            </div>
-
-            <!-- Total Estimasi Footer -->
-            <div class="pt-3 border-t border-line flex items-center justify-between text-xs">
-                <span class="text-ink-soft font-semibold">Total Estimasi Uang Belanja:</span>
-                <span class="font-extrabold text-brand tabular-nums text-sm">
-                    Rp {{ number_format($stats['estimated_budget'], 0, ',', '.') }}
-                </span>
-            </div>
+                    <div class="rounded-xl bg-white/[.06] px-1 py-2">
+                        <dt class="text-[10.5px] text-white/65">Dipantau</dt>
+                        <dd class="mt-0.5 font-mono text-sm sm:text-base font-bold tabular-nums">{{ $stats['total'] }}</dd>
+                    </div>
+                </dl>
+                @if($mlInfo['accuracy'] === null)
+                    <p class="mt-2 text-[11px] text-white/60">Akurasi muncul setelah ada 3 minggu riwayat pesanan.</p>
+                @endif
+            </figure>
         </div>
 
-    </div>
+        <!-- Cara AI menghitung: 3 langkah singkat + rumus untuk yang ingin tahu -->
+        <div class="relative mt-4 pt-3 sm:mt-6 sm:pt-5 border-t border-white/10">
+            <ol class="hidden sm:grid grid-cols-3 gap-3 text-xs">
+                @foreach([
+                    ['Belajar', 'Membaca 30 hari pesanan penghuni setiap barang.'],
+                    ['Memprediksi', 'Regresi linier + rata-rata 7 hari menebak kebutuhan minggu depan.'],
+                    ['Menyarankan', 'Beli = prediksi + cadangan − stok yang ada.'],
+                ] as $i => [$t, $d])
+                    <li class="flex flex-col sm:flex-row items-center sm:items-start gap-1.5 sm:gap-2.5 text-center sm:text-left">
+                        <span class="sm:mt-0.5 w-6 h-6 sm:w-5 sm:h-5 shrink-0 rounded-full bg-white/15 font-mono text-[11px] font-bold flex items-center justify-center">{{ $i + 1 }}</span>
+                        <span><b class="text-white">{{ $t }}<span class="hidden sm:inline">.</span></b> <span class="hidden sm:inline text-white/75">{{ $d }}</span></span>
+                    </li>
+                @endforeach
+            </ol>
+            <details class="group sm:mt-3 text-xs">
+                <summary class="cursor-pointer list-none flex sm:inline-flex items-center gap-1.5 text-white/75 sm:text-white/65 hover:text-white min-h-[36px] sm:min-h-0">
+                    <svg class="w-3 h-3 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    <span class="sm:hidden">Bagaimana AI menghitung? <span class="text-white/55">Belajar · Memprediksi · Menyarankan</span></span>
+                    <span class="hidden sm:inline">Lihat rumus model</span>
+                </summary>
+                <ol class="sm:hidden mt-2 space-y-1.5">
+                    <li><b>1. Belajar</b> <span class="text-white/75">dari 30 hari pesanan penghuni.</span></li>
+                    <li><b>2. Memprediksi</b> <span class="text-white/75">kebutuhan minggu depan (regresi linier + rata-rata 7 hari).</span></li>
+                    <li><b>3. Menyarankan</b> <span class="text-white/75">beli = prediksi + cadangan − stok.</span></li>
+                </ol>
+                <div class="mt-2 rounded-xl bg-black/25 p-3 font-mono text-[11px] leading-relaxed text-white/85 space-y-0.5">
+                    <p>Prediksi_7H = 0,5 × Regresi_Linier_7H + 0,5 × Rata2_7_hari × 7</p>
+                    <p>Target = Prediksi_7H + Cadangan · Saran_beli = max(0, Target − Stok)</p>
+                    <p>Akurasi = 1 − |prediksi − aktual| ÷ aktual (uji mundur 7 hari terakhir)</p>
+                    <p class="text-white/55">Dijalankan Python (scikit-learn) di latar belakang; hasil disimpan ke basis data.</p>
+                </div>
+            </details>
+        </div>
+    </section>
 
     <!-- ============================================================== -->
-    <!-- 4. TABEL SELURUH PERSEDIAAN BARANG (13 ITEM) -->
+    <!-- 2. BELANJA MINGGU INI                                          -->
     <!-- ============================================================== -->
-    <div class="bg-surface rounded-2xl border border-line shadow-xs overflow-hidden space-y-4 p-5 sm:p-6">
-        
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-line pb-4">
+    <section aria-labelledby="buy-title">
+        <div class="flex items-end justify-between gap-3 mb-3 px-0.5">
             <div>
-                <h3 class="text-sm font-bold text-ink">
-                    Tabel Seluruh Persediaan Barang (13 Item)
-                </h3>
-                <p class="text-xs text-ink-soft mt-0.5">
-                    Pantau kebiasaan konsumsi penghuni, sisa stok di kos, perkiraan hari habis, dan saran pembelian.
+                <h2 id="buy-title" class="text-base sm:text-lg font-bold text-ink">Belanja minggu ini</h2>
+                <p class="text-xs text-ink-soft">
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-2 rounded-sm bg-ink-faint/60"></span>stok sekarang</span>
+                    <span class="mx-1.5 text-ink-faint">·</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-2 rounded-sm forecast-hatch" style="--c: var(--color-brand)"></span>prediksi 7 hari</span>
+                    <span class="mx-1.5 text-ink-faint">·</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3 h-2 rounded-sm bg-brand/25"></span>cadangan</span>
                 </p>
             </div>
-
-            <!-- Input Pencarian Cepat -->
-            <div class="w-full sm:w-64">
-                <input type="text" 
-                       x-model="searchQuery" 
-                       placeholder="Cari nama barang..." 
-                       class="w-full text-xs px-3.5 py-2 border border-line rounded-xl text-ink placeholder-ink-faint focus:outline-none focus:ring-2 focus:ring-brand-wash focus:border-brand bg-surface">
-            </div>
         </div>
 
-        <!-- Filter Tab Pills -->
-        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-            <button type="button" 
-                    @click="activeFilter = 'semua'"
-                    :class="activeFilter === 'semua' ? 'bg-brand text-surface font-bold shadow-2xs' : 'bg-canvas text-ink-soft hover:bg-line font-medium'"
-                    class="px-3 py-1.5 rounded-full transition-all flex items-center space-x-1.5 whitespace-nowrap">
-                <span>Semua Barang</span>
-                <span class="text-2xs px-1.5 py-0.2 rounded-full"
-                      :class="activeFilter === 'semua' ? 'bg-brand-deep text-surface' : 'bg-line text-ink-soft'">
-                    {{ $stats['total'] }}
-                </span>
-            </button>
-
-            <button type="button" 
-                    @click="activeFilter = 'restock'"
-                    :class="activeFilter === 'restock' ? 'bg-brand text-surface font-bold shadow-2xs' : 'bg-canvas text-ink-soft hover:bg-line font-medium'"
-                    class="px-3 py-1.5 rounded-full transition-all flex items-center space-x-1.5 whitespace-nowrap">
-                <span>Perlu Belanja Saja</span>
-                <span class="text-2xs px-1.5 py-0.2 rounded-full"
-                      :class="activeFilter === 'restock' ? 'bg-brand-deep text-surface' : 'bg-line text-ink-soft'">
-                    {{ $stats['need_restock'] }}
-                </span>
-            </button>
-
-            <button type="button" 
-                    @click="activeFilter = 'kritis'"
-                    :class="activeFilter === 'kritis' ? 'bg-alert text-surface font-bold shadow-2xs' : 'bg-canvas text-ink-soft hover:bg-line font-medium'"
-                    class="px-3 py-1.5 rounded-full transition-all flex items-center space-x-1.5 whitespace-nowrap">
-                <span>Mendesak</span>
-                <span class="text-2xs px-1.5 py-0.2 rounded-full"
-                      :class="activeFilter === 'kritis' ? 'bg-alert text-surface' : 'bg-line text-ink-soft'">
-                    {{ $stats['kritis'] }}
-                </span>
-            </button>
-
-            <button type="button" 
-                    @click="activeFilter = 'galon'"
-                    :class="activeFilter === 'galon' ? 'bg-brand text-surface font-bold shadow-2xs' : 'bg-canvas text-ink-soft hover:bg-line font-medium'"
-                    class="px-3 py-1.5 rounded-full transition-all flex items-center space-x-1.5 whitespace-nowrap">
-                <span>Khusus Galon</span>
-                <span class="text-2xs px-1.5 py-0.2 rounded-full"
-                      :class="activeFilter === 'galon' ? 'bg-brand-deep text-surface' : 'bg-line text-ink-soft'">
-                    {{ $predictions->where('catalogItem.category', 'galon')->count() }}
-                </span>
-            </button>
-
-            <button type="button" 
-                    @click="activeFilter = 'makanan'"
-                    :class="activeFilter === 'makanan' ? 'bg-brand text-surface font-bold shadow-2xs' : 'bg-canvas text-ink-soft hover:bg-line font-medium'"
-                    class="px-3 py-1.5 rounded-full transition-all flex items-center space-x-1.5 whitespace-nowrap">
-                <span>Makanan</span>
-                <span class="text-2xs px-1.5 py-0.2 rounded-full"
-                      :class="activeFilter === 'makanan' ? 'bg-brand-deep text-surface' : 'bg-line text-ink-soft'">
-                    {{ $predictions->where('catalogItem.category', 'makanan')->count() }}
-                </span>
-            </button>
-
-            <button type="button" 
-                    @click="activeFilter = 'minuman'"
-                    :class="activeFilter === 'minuman' ? 'bg-brand text-surface font-bold shadow-2xs' : 'bg-canvas text-ink-soft hover:bg-line font-medium'"
-                    class="px-3 py-1.5 rounded-full transition-all flex items-center space-x-1.5 whitespace-nowrap">
-                <span>Minuman</span>
-                <span class="text-2xs px-1.5 py-0.2 rounded-full"
-                      :class="activeFilter === 'minuman' ? 'bg-brand-deep text-surface' : 'bg-line text-ink-soft'">
-                    {{ $predictions->where('catalogItem.category', 'minuman')->count() }}
-                </span>
-            </button>
-        </div>
-
-        <!-- Tabel Render -->
-        <div class="overflow-x-auto -mx-5 sm:-mx-6">
-            <table class="w-full text-left text-xs table-stack">
-                <thead>
-                    <tr class="bg-canvas border-y border-line text-ink-soft uppercase tracking-wider font-semibold">
-                        <th class="py-3.5 px-5 sm:px-6">Nama Barang</th>
-                        <th class="py-3.5 px-4">Konsumsi Penghuni</th>
-                        <th class="py-3.5 px-4">Stok di Kos & Ketahanan</th>
-                        <th class="py-3.5 px-4">Kebutuhan 7 Hari</th>
-                        <th class="py-3.5 px-4">Saran Belanja</th>
-                        <th class="py-3.5 px-4">Kondisi</th>
-                        <th class="py-3.5 px-5 sm:px-6 text-right">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-line">
-                    @forelse($predictions as $pred)
-                        @php
-                            $item = $pred->catalogItem;
-                            $formula = $pred->formula_detail;
-                            $daysSupply = $pred->days_of_supply;
-                            $pctStock = min(100, round(($pred->current_stock / max(1, $pred->target_stock)) * 100));
-                        @endphp
-                        <tr x-show="matchesFilter({
-                                name: '{{ addslashes($item?->name) }}',
-                                category: '{{ $item?->category }}',
-                                status: '{{ $pred->status }}',
-                                restock_qty: {{ $pred->recommended_restock_qty }}
-                            })"
-                            class="hover:bg-canvas/60 transition-colors">
-                            
-                            <!-- 1. Nama Barang & Kategori -->
-                            <td class="py-4 px-5 sm:px-6" data-primary>
-                                <div class="flex items-center space-x-3">
-                                    <div class="w-9 h-9 rounded-xl bg-canvas border border-line flex items-center justify-center text-base flex-shrink-0">
-                                        @if($item?->category === 'galon')
-                                            💧
-                                        @elseif($item?->category === 'makanan')
-                                            🍳
-                                        @else
-                                            ☕
-                                        @endif
-                                    </div>
-                                    <div>
-                                        <p class="font-bold text-ink leading-tight text-xs sm:text-sm">
-                                            {{ $item?->name ?? 'Produk' }}
-                                        </p>
-                                        <div class="flex items-center space-x-2 text-2xs text-ink-soft uppercase font-medium mt-0.5">
-                                            <span>{{ $item?->category }}</span>
-                                            <span>&bull;</span>
-                                            <span class="text-ink-soft">Cadangan Minimal: <strong class="text-ink tabular-nums">{{ $formula['safety'] }} {{ $item?->unit }}</strong></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </td>
-
-                            <!-- 2. Konsumsi Penghuni (Rata-rata & Tren) -->
-                            <td class="py-4 px-4 whitespace-nowrap" data-label="Konsumsi"><div class="cell-value">
-                                <div class="space-y-1">
-                                    <div class="font-bold text-ink tabular-nums text-xs sm:text-sm">
-                                        {{ number_format($pred->daily_avg_sales, 1) }}
-                                        <span class="text-xs font-normal text-ink-soft">{{ $item?->unit }}/hari</span>
-                                    </div>
-                                    @if($pred->sales_trend === 'naik')
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-bold bg-done-wash text-done border border-done/20">
-                                            ↗ Makin Ramai
-                                        </span>
-                                    @elseif($pred->sales_trend === 'turun')
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-canvas text-ink-soft border border-line">
-                                            ↘ Menurun
-                                        </span>
+        @if($needCount > 0)
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+                @foreach($shoppingChecklist as $p)
+                    @php
+                        $st = $statusStyle[$p->status] ?? $statusStyle['waspada'];
+                        $target = $p->target_stock ?: ($p->predicted_demand_qty + $p->safety_stock);
+                        $scale = max($target, $p->current_stock, 1);
+                        $belowBuffer = $p->current_stock <= $p->safety_stock;
+                        $unit = $p->catalogItem?->unit;
+                        $tr = $trend[$p->sales_trend] ?? $trend['stabil'];
+                    @endphp
+                    <article class="bg-surface rounded-3xl border border-line shadow-xs p-4 sm:p-5 flex flex-col">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <h3 class="text-sm font-bold text-ink leading-snug">{{ $p->catalogItem?->name }}</h3>
+                                <p class="text-2xs mt-0.5">
+                                    @if($p->days_of_supply <= 2.5)
+                                        <span class="text-alert font-semibold">Habis ~{{ $p->days_of_supply }} hari</span>
+                                    @elseif($belowBuffer)
+                                        <span class="text-alert font-semibold">Di bawah cadangan</span>
                                     @else
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium bg-canvas text-ink-soft border border-line">
-                                            → Normal
-                                        </span>
+                                        <span class="text-ink-soft">Cukup ~{{ $p->days_of_supply }} hari</span>
                                     @endif
+                                    <span class="text-ink-faint">·</span>
+                                    <span class="{{ $tr[1] }}">{{ $tr[0] }}</span>
+                                </p>
+                            </div>
+                            <span class="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold {{ $st['pill'] }}">{{ $st['label'] }}</span>
+                        </div>
+
+                        <!-- Stok sekarang vs prediksi kebutuhan -->
+                        <div class="mt-3 sm:mt-4 space-y-1.5 text-2xs text-ink-soft">
+                            <div class="flex items-center gap-2">
+                                <div class="flex-1 h-2.5 rounded-full bg-canvas overflow-hidden">
+                                    <div class="h-full rounded-full bg-ink-faint/60" style="width: {{ round($p->current_stock / $scale * 100) }}%"></div>
                                 </div>
-                            </div></td>
-
-                            <!-- 3. Stok di Kos & Ketahanan Waktu -->
-                            <td class="py-4 px-4 whitespace-nowrap min-w-[170px]" data-label="Stok di kos"><div class="cell-value">
-                                <div class="space-y-1.5">
-                                    <div class="flex items-baseline justify-between text-xs tabular-nums">
-                                        <span class="font-bold text-ink">
-                                            Sisa: <span class="{{ $pred->current_stock <= $formula['safety'] ? 'text-alert font-extrabold' : 'text-ink' }}">{{ $pred->current_stock }} {{ $item?->unit }}</span>
-                                        </span>
-                                        <span class="text-2xs font-semibold {{ $daysSupply <= 2.5 ? 'text-alert font-bold' : ($daysSupply <= 5 ? 'text-wait' : 'text-done') }}">
-                                            {{ $daysSupply <= 2.5 ? 'Habis ~' . $daysSupply . ' hari' : 'Cukup ~' . $daysSupply . ' hari' }}
-                                        </span>
-                                    </div>
-
-                                    <!-- Visual Progress Bar -->
-                                    <div class="w-full bg-canvas rounded-full h-1.5 overflow-hidden border border-line/40">
-                                        <div class="h-1.5 rounded-full transition-all duration-500 {{ $pred->status === 'kritis' ? 'bg-alert' : ($pred->status === 'waspada' ? 'bg-wait' : 'bg-done') }}"
-                                             style="width: {{ $pctStock }}%"></div>
+                                <span class="w-14 text-right font-mono tabular-nums text-ink">{{ $p->current_stock }}</span>
+                            </div>
+                            <div class="flex items-center gap-2" title="Target {{ $target }} = prediksi {{ $p->predicted_demand_qty }} + cadangan {{ $target - $p->predicted_demand_qty }}">
+                                <div class="flex-1 h-2.5 rounded-full bg-canvas overflow-hidden">
+                                    <div class="h-full flex ml-grow" style="width: {{ round($target / $scale * 100) }}%">
+                                        <div class="h-full forecast-hatch" style="--c: {{ $st['c'] }}; width: {{ round($p->predicted_demand_qty / max($target, 1) * 100) }}%"></div>
+                                        <div class="h-full flex-1 bg-brand/25"></div>
                                     </div>
                                 </div>
-                            </div></td>
+                                <span class="w-14 text-right font-mono tabular-nums text-ink">{{ $target }}</span>
+                            </div>
+                            <p class="text-[11px] text-ink-faint">Butuh {{ $target }} = prediksi {{ $p->predicted_demand_qty }} + cadangan {{ $target - $p->predicted_demand_qty }}</p>
+                        </div>
 
-                            <!-- 4. Kebutuhan 7 Hari -->
-                            <td class="py-4 px-4 whitespace-nowrap" data-label="Kebutuhan 7 hari"><div class="cell-value">
-                                <div class="space-y-0.5 tabular-nums">
-                                    <span class="font-bold text-ink text-xs">
-                                        {{ $pred->predicted_demand_qty }} {{ $item?->unit }}
-                                    </span>
-                                    <span class="text-2xs text-ink-faint block">
-                                        Target total: {{ $pred->target_stock }}
-                                    </span>
-                                </div>
-                            </div></td>
-
-                            <!-- 5. Saran Belanja -->
-                            <td class="py-4 px-4 whitespace-nowrap" data-label="Saran belanja"><div class="cell-value">
-                                @if($pred->recommended_restock_qty > 0)
-                                    <div class="space-y-0.5">
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-extrabold tabular-nums {{ $pred->status === 'kritis' ? 'bg-alert-wash text-alert border border-alert/20' : 'bg-wait-wash text-wait border border-wait/20' }}">
-                                            + {{ $pred->recommended_restock_qty }} {{ $item?->unit }}
-                                        </span>
-                                        <p class="text-2xs font-semibold text-brand tabular-nums">
-                                            Est. {{ $pred->formatted_estimated_cost }}
-                                        </p>
-                                    </div>
-                                @else
-                                    <div class="space-y-0.5">
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold bg-done-wash text-done border border-done/20">
-                                            ✓ Cukup
-                                        </span>
-                                        <span class="text-2xs text-ink-faint block">Tidak perlu belanja</span>
-                                    </div>
-                                @endif
-                            </div></td>
-
-                            <!-- 6. Kondisi -->
-                            <td class="py-4 px-4 whitespace-nowrap" data-label="Kondisi"><div class="cell-value">
-                                @if($pred->status === 'kritis')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-2xs font-bold bg-alert-wash text-alert border border-alert/20">
-                                        Mendesak
-                                    </span>
-                                @elseif($pred->status === 'waspada')
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-2xs font-bold bg-wait-wash text-wait border border-wait/20">
-                                        Perlu Ditambah
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-2xs font-bold bg-done-wash text-done border border-done/20">
-                                        Aman
-                                    </span>
-                                @endif
-                            </div></td>
-
-                            <!-- 7. Aksi Cepat (1-Klik Restock) -->
-                            <td class="py-4 px-5 sm:px-6 text-right whitespace-nowrap" data-actions>
-                                <button type="button" 
-                                        @click="openRestock({
-                                            prediction_id: {{ $pred->id }},
-                                            name: '{{ addslashes($item?->name) }}',
-                                            unit: '{{ $item?->unit }}',
-                                            current_stock: {{ $pred->current_stock }},
-                                            target_stock: {{ $pred->target_stock }},
-                                            restock_qty: {{ $pred->recommended_restock_qty }},
-                                            price: {{ $item?->price ?? 0 }}
-                                        })"
-                                        class="h-8 px-3 rounded-xl {{ $pred->recommended_restock_qty > 0 ? 'bg-brand hover:bg-brand-deep text-surface' : 'bg-canvas hover:bg-line text-ink' }} text-xs font-bold transition-all shadow-2xs inline-flex items-center space-x-1">
-                                    <span>{{ $pred->recommended_restock_qty > 0 ? 'Catat Belanja' : '+ Stok' }}</span>
-                                </button>
-                            </td>
-
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="7" class="p-8 text-center text-ink-faint text-xs">
-                                Belum ada data analisis kebutuhan stok. Klik tombol <strong>Perbarui Hitungan Kebutuhan</strong> di atas.
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-    </div>
+                        <div class="mt-3 sm:mt-4 pt-3 border-t border-dashed border-line flex items-center justify-between gap-3">
+                            <div>
+                                <p class="font-display text-xl font-bold text-ink leading-none">+{{ $p->recommended_restock_qty }} <span class="text-sm font-semibold text-ink-soft">{{ $unit }}</span></p>
+                                <p class="text-2xs text-ink-soft mt-1 font-mono">≈ {{ $p->formatted_estimated_cost }}</p>
+                            </div>
+                            <button type="button" @click="openRestock(@js($restockPayload($p)))"
+                                    class="h-10 px-3.5 rounded-xl bg-brand text-surface text-xs font-bold inline-flex items-center gap-1.5">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                Sudah dibeli
+                            </button>
+                        </div>
+                    </article>
+                @endforeach
+            </div>
+        @else
+            <div class="bg-done-wash border border-done/20 rounded-3xl p-6 text-center">
+                <p class="text-sm font-bold text-done">Tidak ada yang perlu dibeli</p>
+                <p class="text-xs text-ink-soft mt-1">Stok semua barang cukup untuk perkiraan 7 hari ke depan.</p>
+            </div>
+        @endif
+    </section>
 
     <!-- ============================================================== -->
-    <!-- MODAL 1: PANDUAN MEMBACA PREDIKSI (RAMAH PEMILIK KOS + TAB TEKNIS) -->
+    <!-- 3. SEMUA BARANG YANG DIPANTAU                                  -->
     <!-- ============================================================== -->
-    <div x-show="guideModalOpen" 
-         x-cloak
-         class="fixed inset-0 z-50 overflow-y-auto" 
-         role="dialog" 
-         aria-modal="true">
-        
-        <div x-show="guideModalOpen" 
-             x-transition:enter="ease-out duration-300"
-             x-transition:enter-start="opacity-0"
-             x-transition:enter-end="opacity-100"
-             x-transition:leave="ease-in duration-200"
-             x-transition:leave-start="opacity-100"
-             x-transition:leave-end="opacity-0"
-             @click="guideModalOpen = false" 
-             class="fixed inset-0 bg-ink/50 backdrop-blur-xs"></div>
-
-        <div class="min-h-full flex items-center justify-center p-4 text-center">
-            <div x-show="guideModalOpen" 
-                 x-transition:enter="ease-out duration-300 transform"
-                 x-transition:enter-start="opacity-0 scale-95"
-                 x-transition:enter-end="opacity-100 scale-100"
-                 x-transition:leave="ease-in duration-200 transform"
-                 x-transition:leave-start="opacity-100 scale-100"
-                 x-transition:leave-end="opacity-0 scale-95"
-                 class="relative bg-surface w-full max-w-2xl rounded-3xl p-6 sm:p-7 text-left shadow-2xl border border-line overflow-hidden space-y-5">
-                
-                <div class="flex items-center justify-between border-b border-line pb-3">
-                    <div class="flex items-center space-x-2.5">
-                        <div class="w-9 h-9 rounded-xl bg-brand-wash text-brand flex items-center justify-center text-lg">
-                            💡
-                        </div>
-                        <div>
-                            <h3 class="text-base font-extrabold text-ink">Panduan Membaca Prediksi Stok</h3>
-                            <p class="text-xs text-ink-soft">Penjelasan mudah cara sistem membantu pengadaan barang kos</p>
-                        </div>
-                    </div>
-                    <button @click="guideModalOpen = false" class="p-1 text-ink-faint hover:text-ink-soft rounded-lg">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
+    @php
+        $countGalon = $predictions->filter(fn ($p) => $p->catalogItem?->category === 'galon')->count();
+    @endphp
+    <section aria-labelledby="all-title" class="bg-surface rounded-3xl border border-line shadow-xs">
+        <div class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <h2 id="all-title" class="text-base font-bold text-ink">Semua barang dipantau</h2>
+                <p class="text-xs text-ink-soft">Berapa lama stok bertahan menurut prediksi.</p>
+            </div>
+            <div class="flex gap-1.5 text-xs" role="tablist">
+                @foreach(['semua' => ['Semua', $stats['total']], 'beli' => ['Perlu beli', $needCount], 'galon' => ['Galon', $countGalon]] as $key => [$label, $n])
+                    <button type="button" role="tab" @click="filter = '{{ $key }}'" :aria-selected="filter === '{{ $key }}'"
+                            :class="filter === '{{ $key }}' ? 'bg-brand text-surface border-brand' : 'bg-surface text-ink-soft border-line hover:bg-canvas'"
+                            class="h-9 px-3 rounded-full border font-semibold inline-flex items-center gap-1.5">
+                        {{ $label }} <span class="font-mono text-[11px] opacity-80">{{ $n }}</span>
                     </button>
-                </div>
-
-                <!-- Tab Switcher: Pemilik Kos vs Developer/Sidang -->
-                <div class="flex items-center border border-line rounded-xl p-1 bg-canvas">
-                    <button type="button" 
-                            @click="guideTab = 'owner'" 
-                            :class="guideTab === 'owner' ? 'bg-surface text-ink font-bold shadow-2xs' : 'text-ink-soft hover:text-ink font-medium'"
-                            class="flex-1 py-1.5 text-xs rounded-lg transition-all text-center">
-                        Untuk Pemilik Kos (Bahasa Sehari-hari)
-                    </button>
-                    <button type="button" 
-                            @click="guideTab = 'tech'" 
-                            :class="guideTab === 'tech' ? 'bg-surface text-ink font-bold shadow-2xs' : 'text-ink-soft hover:text-ink font-medium'"
-                            class="flex-1 py-1.5 text-xs rounded-lg transition-all text-center">
-                        Rincian Teknis & Rumus (Untuk Sidang / Dev)
-                    </button>
-                </div>
-
-                <!-- TAB 1: RAMAH PEMILIK KOS -->
-                <div x-show="guideTab === 'owner'" class="space-y-4 text-xs">
-                    
-                    <div class="p-3.5 bg-canvas rounded-2xl border border-line space-y-1">
-                        <h4 class="font-bold text-ink">1. Bagaimana cara sistem tahu berapa barang yang harus dibeli?</h4>
-                        <p class="text-ink-soft leading-relaxed">
-                            Sistem otomatis membaca riwayat pesanan seluruh penghuni kamar dalam 30 hari terakhir. Jika suatu barang sering dipesan (misalnya kopi dan mie saat nugas malam, atau galon air di akhir pekan), sistem akan menghitung perkiraan kebutuhan untuk 7 hari ke depan agar stok tidak kehabisan.
-                        </p>
-                    </div>
-
-                    <div class="p-3.5 bg-canvas rounded-2xl border border-line space-y-1.5">
-                        <h4 class="font-bold text-ink">2. Apa arti warna status barang?</h4>
-                        <ul class="space-y-1 text-ink-soft leading-relaxed">
-                            <li class="flex items-start space-x-2">
-                                <span class="w-2.5 h-2.5 rounded-full bg-alert mt-1 shrink-0"></span>
-                                <div><strong class="text-alert">Mendesak (Merah):</strong> Stok di kos sudah hampir habis (di bawah cadangan minimal) atau diperkirakan habis dalam 1&ndash;2 hari. Harus segera dibeli hari ini.</div>
-                            </li>
-                            <li class="flex items-start space-x-2">
-                                <span class="w-2.5 h-2.5 rounded-full bg-wait mt-1 shrink-0"></span>
-                                <div><strong class="text-wait">Perlu Ditambah (Kuning):</strong> Stok saat ini masih ada, namun diperkirakan tidak cukup untuk memenuhi pesanan seminggu ke depan.</div>
-                            </li>
-                            <li class="flex items-start space-x-2">
-                                <span class="w-2.5 h-2.5 rounded-full bg-done mt-1 shrink-0"></span>
-                                <div><strong class="text-done">Aman (Hijau):</strong> Persediaan di kos masih sangat cukup untuk 1&ndash;2 minggu ke depan. Tidak perlu keluar modal belanja.</div>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <div class="p-3.5 bg-canvas rounded-2xl border border-line space-y-1">
-                        <h4 class="font-bold text-ink">3. Apa itu "Cadangan Minimal"?</h4>
-                        <p class="text-ink-soft leading-relaxed">
-                            Cadangan minimal adalah jumlah barang yang sebaiknya selalu tersisa di gudang kos. Tujuannya sebagai pegangan darurat jika ada lonjakan pesanan mendadak atau jika agen galon/toko langganan sedang tutup di hari libur.
-                        </p>
-                    </div>
-
-                    <div class="p-3.5 bg-canvas rounded-2xl border border-line space-y-1">
-                        <h4 class="font-bold text-ink">4. Bagaimana cara praktis menggunakan fitur ini?</h4>
-                        <p class="text-ink-soft leading-relaxed">
-                            Cukup buka bagian <strong>"Daftar Belanja Siap Pakai"</strong> di sisi kanan, klik <strong>"Salin ke WhatsApp"</strong>, lalu kirim ke petugas kos atau toko agen. Begitu barang belanjaan tiba di kos, klik tombol <strong>"+ Catat Dibeli"</strong> agar jumlah stok di aplikasi langsung bertambah.
-                        </p>
-                    </div>
-
-                </div>
-
-                <!-- TAB 2: TEKNIS & SIDANG SKRIPSI/TUGAS AKHIR -->
-                <div x-show="guideTab === 'tech'" class="space-y-4 text-xs">
-                    
-                    <div class="space-y-2">
-                        <h4 class="text-xs font-bold text-ink uppercase tracking-wider">Arsitektur Pipeline (Decoupled Architecture)</h4>
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                            <div class="p-3 bg-canvas rounded-xl border border-line">
-                                <span class="font-bold text-brand block mb-1">1. Laravel Framework</span>
-                                Menyimpan transaksi pesanan dan memanggil worker eksternal.
-                            </div>
-                            <div class="p-3 bg-canvas rounded-xl border border-line">
-                                <span class="font-bold text-brand block mb-1">2. Artisan CLI</span>
-                                Command <code class="font-mono text-2xs bg-line px-1 rounded">stok:prediksi</code> dijalankan terjadwal / on-demand.
-                            </div>
-                            <div class="p-3 bg-canvas rounded-xl border border-line">
-                                <span class="font-bold text-brand block mb-1">3. Python Regression</span>
-                                Melatih model Scikit-Learn dan menyimpan proyeksi ke database.
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="space-y-1.5">
-                        <h4 class="text-xs font-bold text-ink uppercase tracking-wider">Rumus Matematika Proyeksi</h4>
-                        <div class="bg-ink text-brand-wash p-3.5 rounded-xl space-y-1 font-mono text-2xs">
-                            <p class="text-white font-bold">1. Garis Regresi Linier:</p>
-                            <p class="pl-2 text-ink-faint">y = (m &times; Hari) + c  (m = Slope koefisien tren, c = Intersep)</p>
-                            <p class="pl-2 text-brand-wash">Prediksi_7H = (0.5 &times; Regresi_7H) + (0.5 &times; Moving_Avg_7H)</p>
-                            
-                            <p class="text-white font-bold pt-1">2. Target Stok & Saran Belanja:</p>
-                            <p class="pl-2 text-brand-wash">Target = Prediksi_7H + Safety_Stock</p>
-                            <p class="pl-2 text-brand-wash">Saran_Restock = max(0, Target - Stok_Saat_Ini)</p>
-
-                            <p class="text-white font-bold pt-1">3. Ketahanan Stok (Days of Supply):</p>
-                            <p class="pl-2 text-brand-wash">Days_of_Supply = Stok_Saat_Ini / max(Rata_Rata_Harian, 0.5)</p>
-                        </div>
-                    </div>
-
-                </div>
-
-                <div class="pt-3 border-t border-line text-right">
-                    <button type="button" 
-                            @click="guideModalOpen = false"
-                            class="px-5 py-2.5 bg-brand hover:bg-brand-deep text-surface rounded-xl text-xs font-bold transition-colors">
-                        Tutup Panduan
-                    </button>
-                </div>
-
+                @endforeach
             </div>
         </div>
-    </div>
 
-    <!-- ============================================================== -->
-    <!-- MODAL 2: KONFIRMASI CATAT BARANG MASUK -->
-    <!-- ============================================================== -->
-    <div x-show="restockModalOpen" 
-         x-cloak
-         class="fixed inset-0 z-50 overflow-y-auto" 
-         role="dialog" 
-         aria-modal="true">
-        
-        <div x-show="restockModalOpen" 
-             x-transition:enter="ease-out duration-300"
-             x-transition:enter-start="opacity-0"
-             x-transition:enter-end="opacity-100"
-             x-transition:leave="ease-in duration-200"
-             x-transition:leave-start="opacity-100"
-             x-transition:leave-end="opacity-0"
-             @click="restockModalOpen = false" 
-             class="fixed inset-0 bg-ink/50 backdrop-blur-xs"></div>
-
-        <div class="min-h-full flex items-center justify-center p-4 text-center">
-            <div x-show="restockModalOpen" 
-                 x-transition:enter="ease-out duration-300 transform"
-                 x-transition:enter-start="opacity-0 scale-95"
-                 x-transition:enter-end="opacity-100 scale-100"
-                 x-transition:leave="ease-in duration-200 transform"
-                 x-transition:leave-start="opacity-100 scale-100"
-                 x-transition:leave-end="opacity-0 scale-95"
-                 class="relative bg-surface w-full max-w-md rounded-3xl p-6 text-left shadow-2xl border border-line overflow-hidden space-y-4">
-                
-                <div class="flex items-center justify-between border-b border-line pb-3">
-                    <div>
-                        <h3 class="text-base font-extrabold text-ink">Catat Barang Masuk ke Kos</h3>
-                        <p class="text-xs text-ink-soft">Menambahkan stok fisik dan mencatat riwayat secara otomatis</p>
-                    </div>
-                    <button @click="restockModalOpen = false" class="p-1 text-ink-faint hover:text-ink-soft rounded-lg">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <template x-if="selectedItem">
-                    <form :action="restockActionUrl" method="POST" class="space-y-4">
-                        @csrf
-
-                        <!-- Ringkasan Barang -->
-                        <div class="p-3.5 bg-canvas rounded-2xl border border-line space-y-1.5 text-xs">
-                            <div class="flex justify-between">
-                                <span class="text-ink-soft">Nama Barang:</span>
-                                <span class="font-bold text-ink" x-text="selectedItem.name"></span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-ink-soft">Stok Saat Ini:</span>
-                                <span class="font-bold text-ink" x-text="selectedItem.current_stock + ' ' + selectedItem.unit"></span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-ink-soft">Target Kebutuhan 7 Hari:</span>
-                                <span class="font-bold text-brand" x-text="selectedItem.target_stock + ' ' + selectedItem.unit"></span>
-                            </div>
-                        </div>
-
-                        <!-- Input Jumlah Masuk -->
-                        <div>
-                            <label class="block text-xs font-bold text-ink mb-1.5">
-                                Jumlah Barang yang Dibeli Masuk (<span x-text="selectedItem.unit"></span>)
-                            </label>
-                            <input type="number" 
-                                   name="quantity" 
-                                   x-model="restockQty" 
-                                   min="1" 
-                                   max="1000" 
-                                   required 
-                                   class="w-full text-sm font-extrabold px-3.5 py-2.5 border border-line rounded-xl text-ink focus:outline-none focus:ring-2 focus:ring-brand-wash focus:border-brand bg-surface tabular-nums">
-                            <span class="text-2xs text-ink-faint mt-1 block">
-                                Stok setelah restock menjadi: <strong class="text-ink tabular-nums" x-text="(parseInt(selectedItem.current_stock) + parseInt(restockQty || 0)) + ' ' + selectedItem.unit"></strong>
+        <ul class="border-t border-line divide-y divide-line" role="list">
+            @forelse($predictions as $p)
+                @php
+                    $st = $statusStyle[$p->status] ?? $statusStyle['aman'];
+                    $days = $p->days_of_supply;
+                    $daysPct = min(100, round(min($days, 14) / 14 * 100));
+                    $cat = $p->catalogItem?->category;
+                @endphp
+                <li x-show="filter === 'semua' || (filter === 'beli' && {{ $p->recommended_restock_qty > 0 ? 'true' : 'false' }}) || (filter === 'galon' && {{ $cat === 'galon' ? 'true' : 'false' }})"
+                    @if($loop->index >= 6) :class="!showAll && filter === 'semua' && 'max-sm:hidden'" @endif>
+                    <button type="button" @click="openRestock(@js($restockPayload($p)))"
+                            class="w-full text-left px-4 sm:px-5 py-3 flex items-center gap-3 hover:bg-canvas/60 active:bg-canvas transition-colors"
+                            aria-label="Catat barang masuk untuk {{ $p->catalogItem?->name }}">
+                        <span class="w-2 h-2 rounded-full shrink-0" style="background: {{ $st['c'] }}" aria-hidden="true"></span>
+                        <span class="min-w-0 flex-1">
+                            <span class="flex items-center justify-between gap-2">
+                                <span class="text-sm font-semibold text-ink truncate">{{ $p->catalogItem?->name }}</span>
+                                <span class="shrink-0 text-2xs {{ $days <= 2.5 ? 'text-alert font-semibold' : 'text-ink-soft' }}">{{ $days >= 14 ? '2 minggu+' : '~' . $days . ' hari' }}</span>
                             </span>
-                        </div>
+                            <span class="mt-1.5 flex items-center gap-2">
+                                <span class="flex-1 h-1.5 rounded-full bg-canvas overflow-hidden" title="Bertahan sekitar {{ $days }} hari (skala 14 hari)">
+                                    <span class="block h-full rounded-full" style="width: {{ $daysPct }}%; background: {{ $st['c'] }}"></span>
+                                </span>
+                                <span class="shrink-0 text-2xs font-mono tabular-nums text-ink-soft">stok {{ $p->current_stock }} · butuh {{ $p->predicted_demand_qty }}</span>
+                            </span>
+                        </span>
+                        <span class="shrink-0 w-8 h-8 rounded-lg border border-line text-ink-soft flex items-center justify-center" aria-hidden="true">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                        </span>
+                    </button>
+                </li>
+            @empty
+                <li class="p-8 text-center text-xs text-ink-faint">Belum ada hasil prediksi. Tekan <b>Hitung ulang</b> di atas.</li>
+            @endforelse
+        </ul>
+        @if($predictions->count() > 6)
+            <button type="button" x-show="!showAll && filter === 'semua'" @click="showAll = true"
+                    class="sm:hidden w-full h-12 border-t border-line text-xs font-semibold text-brand">
+                Tampilkan semua {{ $predictions->count() }} barang
+            </button>
+        @endif
+    </section>
 
-                        <!-- Catatan Opsional -->
-                        <div>
-                            <label class="block text-xs font-bold text-ink mb-1">Catatan Pengadaan (Opsional)</label>
-                            <input type="text" 
-                                   name="notes" 
-                                   x-model="restockNotes" 
-                                   placeholder="Contoh: Kiriman agen galon langganan" 
-                                   class="w-full text-xs px-3.5 py-2.5 border border-line rounded-xl text-ink placeholder-ink-faint focus:outline-none focus:ring-2 focus:ring-brand-wash focus:border-brand bg-surface">
-                        </div>
-
-                        <div class="pt-3 border-t border-line flex items-center justify-end space-x-2">
-                            <button type="button" @click="restockModalOpen = false" class="px-4 py-2.5 rounded-xl border border-line text-xs font-bold text-ink-soft hover:bg-canvas">
-                                Batal
-                            </button>
-                            <button type="submit" class="px-5 py-2.5 rounded-xl bg-brand hover:bg-brand-deep text-surface text-xs font-bold shadow-xs transition-colors">
-                                Simpan & Tambah ke Gudang
-                            </button>
-                        </div>
-                    </form>
-                </template>
-
-            </div>
+    <!-- Bilah salin yang menempel di HP setelah kartu ML digulir lewat -->
+    @if($needCount > 0)
+        <div class="lg:hidden h-14" aria-hidden="true"></div>
+        <div x-data="{ stuck: false }"
+             x-init="'IntersectionObserver' in window && new IntersectionObserver(([e]) => stuck = !e.isIntersecting && e.boundingClientRect.top < 0).observe(document.querySelector('.ml-hero'))"
+             x-show="stuck" x-cloak
+             x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-3" x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0 translate-y-3"
+             class="lg:hidden fixed inset-x-3 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-20">
+            <button type="button" @click="copyWaList()"
+                    class="w-full h-12 rounded-2xl ml-hero text-white shadow-lg flex items-center justify-between gap-3 pl-3 pr-4 text-sm">
+                <span class="flex items-center gap-2 min-w-0">
+                    <span class="w-7 h-7 rounded-lg bg-ochre text-ink flex items-center justify-center shrink-0">
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9L12 2z"/></svg>
+                    </span>
+                    <span class="truncate"><b>{{ $needCount }} barang</b> · <span class="font-mono">{{ $rp($stats['estimated_budget']) }}</span></span>
+                </span>
+                <span class="shrink-0 font-bold" x-text="copiedWa ? 'Tersalin ✓' : 'Salin daftar'">Salin daftar</span>
+            </button>
         </div>
-    </div>
+    @endif
 
+    <!-- ============================================================== -->
+    <!-- LEMBAR CATAT BARANG MASUK                                      -->
+    <!-- ============================================================== -->
+    <x-bottom-sheet show="restockModalOpen" title="Catat barang masuk">
+        <template x-if="selectedItem">
+            <form :action="restockActionUrl" method="POST" class="space-y-4">
+                @csrf
+                <div class="flex items-center justify-between rounded-2xl bg-canvas px-4 py-3">
+                    <div class="min-w-0">
+                        <p class="text-sm font-bold text-ink truncate" x-text="selectedItem.name"></p>
+                        <p class="text-2xs text-ink-soft">Stok sekarang <span class="font-mono" x-text="selectedItem.current_stock + ' ' + selectedItem.unit"></span></p>
+                    </div>
+                    <p class="text-2xs text-ink-soft text-right" x-show="selectedItem.restock_qty > 0">Saran AI<br><b class="font-mono text-brand text-sm" x-text="'+' + selectedItem.restock_qty"></b></p>
+                </div>
+                <div>
+                    <label for="restock-qty" class="block text-xs font-semibold text-ink mb-1.5">Berapa <span x-text="selectedItem.unit"></span> yang dibeli?</label>
+                    <input id="restock-qty" type="number" name="quantity" x-model="restockQty" min="1" max="1000" required inputmode="numeric"
+                           class="w-full h-12 text-center text-xl font-bold font-mono rounded-xl border border-line focus:border-brand focus:ring-1 focus:ring-brand bg-surface text-ink tabular-nums">
+                    <p class="text-2xs text-ink-soft mt-1.5">Stok menjadi <b class="font-mono text-ink" x-text="(parseInt(selectedItem.current_stock) + parseInt(restockQty || 0)) + ' ' + selectedItem.unit"></b></p>
+                </div>
+                <div>
+                    <label for="restock-notes" class="block text-xs font-semibold text-ink mb-1.5">Catatan (opsional)</label>
+                    <input id="restock-notes" type="text" name="notes" x-model="restockNotes" maxlength="150"
+                           class="w-full h-11 text-sm px-3 rounded-xl border border-line focus:border-brand focus:ring-1 focus:ring-brand bg-surface text-ink">
+                </div>
+                <div class="grid grid-cols-[auto_1fr] gap-2 pt-1">
+                    <button type="button" @click="restockModalOpen = false" class="h-12 px-4 rounded-xl border border-line text-sm font-semibold text-ink-soft hover:bg-canvas">Batal</button>
+                    <button type="submit" class="h-12 rounded-xl bg-brand text-surface text-sm font-bold">Tambah ke stok</button>
+                </div>
+            </form>
+        </template>
+    </x-bottom-sheet>
 </div>
 @endsection
-
-@push('scripts')
-@include('layouts.partials.charts-script')
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const ctx = document.getElementById('stockComparisonChart');
-    if (!ctx) return;
-
-    const payload = {!! json_encode($chartPayload) !!};
-
-    const targetColors = payload.statuses.map(function(status) {
-        if (status === 'kritis') return '#b03a22';
-        if (status === 'waspada') return '#a86a0c';
-        return '#4b7d57';
-    });
-
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: payload.labels,
-            datasets: [
-                {
-                    label: 'Stok Ada di Kos',
-                    data: payload.currentStock,
-                    backgroundColor: '#8a9892',
-                    borderRadius: 6,
-                    barPercentage: 0.7,
-                    categoryPercentage: 0.8
-                },
-                {
-                    label: 'Target Kebutuhan (7 Hari)',
-                    data: payload.targetStock,
-                    backgroundColor: targetColors,
-                    borderRadius: 6,
-                    barPercentage: 0.7,
-                    categoryPercentage: 0.8
-                }
-            ]
-        },
-        options: {
-            indexAxis: 'y', // Horizontal Bar Chart
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    backgroundColor: '#16201e',
-                    titleFont: { family: "'Plus Jakarta Sans', sans-serif", size: 12, weight: 'bold' },
-                    bodyFont: { family: "'Plus Jakarta Sans', sans-serif", size: 11 },
-                    padding: 10,
-                    cornerRadius: 8,
-                    callbacks: {
-                        label: function(context) {
-                            const unit = payload.units[context.dataIndex] || '';
-                            const val = context.parsed.x || 0;
-                            return context.dataset.label + ': ' + val + ' ' + unit;
-                        },
-                        afterBody: function(contexts) {
-                            const idx = contexts[0].dataIndex;
-                            const restock = payload.restockQty[idx];
-                            const days = payload.daysOfSupply ? payload.daysOfSupply[idx] : null;
-                            const unit = payload.units[idx] || '';
-                            let lines = [];
-                            if (days !== null) {
-                                lines.push('Perkiraan Cukup: ~' + days + ' hari');
-                            }
-                            if (restock > 0) {
-                                lines.push('Saran Beli: +' + restock + ' ' + unit);
-                            } else {
-                                lines.push('Kondisi: Persediaan Cukup (Aman)');
-                            }
-                            return lines;
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    grid: { color: '#dedbd0' },
-                    ticks: {
-                        font: { family: "'Plus Jakarta Sans', sans-serif", size: 12 },
-                        color: '#46544f',
-                        maxTicksLimit: 6
-                    }
-                },
-                y: {
-                    grid: { display: false },
-                    ticks: {
-                        font: { family: "'Plus Jakarta Sans', sans-serif", size: 12, weight: '600' },
-                        color: '#17211f',
-                        callback: function (value) {
-                            const label = String(this.getLabelForValue(value));
-                            const max = window.innerWidth < 640 ? 14 : 28;
-                            return label.length > max ? label.slice(0, max - 1) + '…' : label;
-                        }
-                    }
-                }
-            }
-        }
-    });
-});
-</script>
-@endpush

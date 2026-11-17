@@ -198,15 +198,12 @@
                             </span>
                         </div>
 
-                        <!-- Baris Daftar Menu (Desktop 2 Kolom, Mobile 1 Kolom) -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        <!-- Kartu Menu (Mobile 2 Kolom, Tablet/Desktop 3 Kolom) -->
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3">
                             @foreach($catItems as $item)
                                 <div x-show="matchesFilter('{{ $item->category }}', '{{ addslashes($item->name) }}')"
-                                     class="bg-surface rounded-2xl border border-line p-3 sm:p-3.5 flex items-center gap-3 shadow-sm hover:shadow-md hover:border-brand/40 transition-all">
-                                    <span class="cat-tile cat-tile--photo" data-cat="{{ $item->category }}" aria-hidden="true">
-                                        <img src="{{ $item->image_url }}" alt="" loading="lazy" class="w-full h-full object-cover">
-                                    </span>
-                                    <div class="flex-1 min-w-0 pr-1 cursor-pointer group active:opacity-75 transition-opacity"
+                                     class="bg-surface rounded-2xl border border-line overflow-hidden flex flex-col shadow-sm hover:shadow-md hover:border-brand/40 transition-all">
+                                    <div class="flex-1 flex flex-col cursor-pointer group active:opacity-75 transition-opacity"
                                          @click="openDetail({
                                              id: {{ $item->id }},
                                              name: '{{ addslashes($item->name) }}',
@@ -219,42 +216,44 @@
                                              description: '{{ addslashes($item->description ?? '') }}',
                                              image_url: '{{ $item->image_url }}'
                                          })">
-                                        <div class="flex items-center gap-1.5">
-                                            <h3 class="text-sm sm:text-base font-bold text-ink group-hover:text-brand transition-colors leading-snug line-clamp-2">
-                                                {{ $item->name }}
-                                            </h3>
-                                        </div>
-
-                                        @if($item->description)
-                                            <p class="text-2xs text-ink-soft leading-normal mt-0.5 line-clamp-1 sm:line-clamp-2 lg:line-clamp-none" title="{{ $item->description }}">
-                                                {{ $item->description }}
-                                            </p>
-                                        @endif
-
-                                        <div class="flex items-center gap-2 mt-1.5 sm:mt-2">
-                                            <span class="text-sm font-extrabold text-brand whitespace-nowrap tabular-nums">
-                                                {{ $item->formatted_price }}
-                                            </span>
+                                        <div class="relative aspect-[4/3] bg-canvas border-b border-line">
+                                            <img src="{{ $item->image_url }}" alt="" loading="lazy" class="w-full h-full object-cover {{ $item->stock <= 0 ? 'grayscale opacity-60' : '' }}">
 
                                             <!-- Sembunyikan angka stok: sisa sedikit jika <= min_stock, habis jika 0 -->
                                             @if($item->stock <= 0)
-                                                <span class="text-2xs font-semibold text-alert">
+                                                <span class="absolute top-2 left-2 text-2xs font-bold text-surface bg-alert px-2 py-0.5 rounded-full">
                                                     Habis
                                                 </span>
                                             @elseif($item->stock <= $item->minimum_stock)
-                                                <span class="text-2xs font-semibold text-wait">
+                                                <span class="absolute top-2 left-2 text-2xs font-bold text-wait bg-wait-wash px-2 py-0.5 rounded-full border border-wait/20">
                                                     Sisa sedikit
                                                 </span>
                                             @endif
                                         </div>
+
+                                        <div class="flex-1 flex flex-col p-2.5 sm:p-3">
+                                            <h3 class="text-sm font-bold text-ink group-hover:text-brand transition-colors leading-snug line-clamp-2">
+                                                {{ $item->name }}
+                                            </h3>
+
+                                            @if($item->description)
+                                                <p class="text-2xs text-ink-soft leading-normal mt-0.5 line-clamp-2" title="{{ $item->description }}">
+                                                    {{ $item->description }}
+                                                </p>
+                                            @endif
+
+                                            <span class="mt-auto pt-1.5 text-sm font-extrabold text-brand whitespace-nowrap tabular-nums">
+                                                {{ $item->formatted_price }}
+                                            </span>
+                                        </div>
                                     </div>
 
                                     <!-- Tombol Tambah / Qty-Stepper -->
-                                    <div class="flex-shrink-0 flex items-center" @click.stop>
+                                    <div class="px-2.5 pb-2.5 sm:px-3 sm:pb-3" @click.stop>
                                         @if($item->stock <= 0)
                                             <button type="button" 
                                                     disabled 
-                                                    class="min-h-[44px] px-3.5 py-1.5 bg-canvas text-ink-faint rounded-xl text-xs font-medium cursor-not-allowed">
+                                                    class="w-full min-h-[44px] px-3.5 py-1.5 bg-canvas text-ink-faint rounded-xl text-xs font-medium cursor-not-allowed">
                                                 Habis
                                             </button>
                                         @else
@@ -268,7 +267,7 @@
                                                             stock: {{ $item->stock }},
                                                             category: '{{ $item->category }}'
                                                         })"
-                                                        class="min-h-[44px] min-w-[44px] px-3.5 py-1.5 bg-brand hover:bg-brand-deep text-surface rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1">
+                                                        class="w-full min-h-[44px] px-3.5 py-1.5 bg-brand hover:bg-brand-deep text-surface rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
                                                     </svg>
@@ -278,7 +277,7 @@
 
                                             <!-- Jika sudah ada di keranjang: Qty-Stepper -->
                                             <template x-if="getItemQty({{ $item->id }}) > 0">
-                                                <div class="inline-flex items-center border border-line rounded-xl bg-canvas overflow-hidden">
+                                                <div class="w-full flex items-center justify-between border border-line rounded-xl bg-canvas overflow-hidden">
                                                     <button type="button" 
                                                             @click="decreaseQty({{ $item->id }})"
                                                             class="min-w-[44px] min-h-[44px] flex items-center justify-center text-ink-soft hover:text-ink transition-colors"

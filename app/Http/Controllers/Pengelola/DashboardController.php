@@ -24,9 +24,10 @@ class DashboardController extends Controller
         $currentMonth = $now->month;
         $currentYear = $now->year;
 
-        // 1. Metrik Okupansi & Penghuni: satu query dikelompokkan per status (bukan 4 query count terpisah)
-        $roomsByStatus = Room::selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status');
-        $roomsCount = (int) $roomsByStatus->sum();
+        // 1. Denah kamar + metrik okupansi dari satu koleksi (tanpa query hitung terpisah)
+        $rooms = Room::with('activeTenantProfile.user')->orderBy('room_number')->get();
+        $roomsByStatus = $rooms->countBy('status');
+        $roomsCount = $rooms->count();
         $occupiedRoomsCount = (int) ($roomsByStatus['terisi'] ?? 0);
         $availableRoomsCount = (int) ($roomsByStatus['tersedia'] ?? 0);
         $repairRoomsCount = (int) ($roomsByStatus['perbaikan'] ?? 0);
@@ -74,9 +75,14 @@ class DashboardController extends Controller
         $activeOrdersCount = Order::whereIn('status', ['menunggu', 'diproses', 'diantar'])->count();
         $stockAlerts = CatalogItem::whereColumn('stock', '<=', 'minimum_stock')->get();
         $overdueBills = RentBill::with(['tenantProfile.user', 'room'])
-            ->whereIn('status', ['menunggu', 'menunggak'])
-            ->where('due_date', '<', $now->toDateString())
+            ->overdue()
             ->get();
+
+        // Status tagihan bulan ini per kamar untuk denah (satu query ringan)
+        $currentBills = RentBill::where('year', $currentYear)->where('month', $currentMonth)
+            ->get(['id', 'room_id', 'status', 'payment_proof', 'amount'])
+            ->keyBy('room_id');
+        $verifyCount = RentBill::where('status', 'menunggu')->whereNotNull('payment_proof')->count();
 
         // 5. Pesanan Layanan Terbaru
         $recentOrders = Order::with(['items', 'user'])
@@ -107,7 +113,10 @@ class DashboardController extends Controller
             'rentSeries',
             'salesSeries',
             'recentOrders',
-            'predictions'
+            'predictions',
+            'rooms',
+            'currentBills',
+            'verifyCount'
         ));
     }
 }

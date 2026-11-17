@@ -46,7 +46,7 @@
                 <input type="text" 
                        name="q" 
                        value="{{ $search ?? '' }}" 
-                       placeholder="Cari kode pesanan (#ORD-...) atau nomor kamar..." 
+                       placeholder="Cari kode pesanan atau kamar" 
                        class="w-full h-10 min-h-[40px] text-xs px-3 pl-8 pr-8 border border-line rounded-xl text-ink placeholder-ink-faint focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand bg-surface shadow-xs">
                 <svg class="w-4 h-4 text-ink-faint absolute left-2.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -92,17 +92,26 @@
                 </a>
 
                 <!-- Chip Pemilih Tanggal Kalender -->
-                <label class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors shrink-0 {{ $isCustomDate ? 'bg-brand-wash text-brand border-brand/20' : 'bg-surface text-ink-soft hover:text-ink border-line' }}">
-                    <svg class="w-3.5 h-3.5 {{ $isCustomDate ? 'text-brand' : 'text-ink-faint' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                    </svg>
-                    <span>{{ $isCustomDate ? \Carbon\Carbon::parse($dateFilter)->translatedFormat('d M Y') : 'Pilih Tanggal' }}</span>
-                    <input type="date" 
-                           name="date" 
-                           value="{{ $dateFilter ?? '' }}" 
-                           onchange="this.form.submit()" 
-                           class="sr-only">
-                </label>
+                <!-- Input tanggal ditumpuk transparan di atas chip agar kalender muncul tepat di bawahnya.
+                     Klik diteruskan ke showPicker(); browser lama memakai focus()+click() sebagai cadangan. -->
+                <div class="relative shrink-0">
+                    <button type="button"
+                            onclick="const i = this.nextElementSibling; try { i.showPicker(); } catch (e) { i.focus(); i.click(); }"
+                            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors {{ $isCustomDate ? 'bg-brand-wash text-brand border-brand/20' : 'bg-surface text-ink-soft hover:text-ink border-line' }}">
+                        <svg class="w-3.5 h-3.5 {{ $isCustomDate ? 'text-brand' : 'text-ink-faint' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        <span>{{ $isCustomDate ? \Carbon\Carbon::parse($dateFilter)->translatedFormat('d M Y') : '' }}@unless($isCustomDate)<span class="sm:hidden">Tanggal</span><span class="hidden sm:inline">Pilih Tanggal</span>@endunless</span>
+                    </button>
+                    <input type="date"
+                           name="date"
+                           value="{{ $dateFilter ?? '' }}"
+                           max="{{ $todayDate }}"
+                           onchange="if (this.value) this.form.submit()"
+                           aria-label="Pilih tanggal riwayat"
+                           tabindex="-1"
+                           class="absolute inset-0 w-full h-full opacity-0 pointer-events-none">
+                </div>
 
                 @if($search || $dateFilter)
                     <a href="{{ route('petugas.history') }}" 
@@ -184,8 +193,8 @@
                                         <span class="font-mono text-ink-soft tabular-nums shrink-0 font-medium">
                                             {{ ($order->completed_at ?? $order->updated_at)->format('H:i') }}
                                         </span>
-                                        <span class="font-bold text-ink shrink-0">
-                                            {{ $order->room_number }}
+                                        <span class="shrink-0 rounded border-[1.5px] border-ink/70 px-1.5 font-mono text-[12px] font-bold leading-[18px] text-ink">
+                                            <span class="sr-only">Kamar </span>{{ trim(str_replace('Kamar', '', $order->room_number)) }}
                                         </span>
                                         <span class="text-ink-soft hidden sm:inline truncate">
                                             &bull; {{ $order->user->name ?? 'Penghuni' }}

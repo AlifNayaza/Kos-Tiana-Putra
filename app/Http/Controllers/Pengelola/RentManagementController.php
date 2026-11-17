@@ -42,7 +42,10 @@ class RentManagementController extends Controller
             $query->where('year', (int) $yearFilter);
         }
 
-        if ($statusFilter && $statusFilter !== 'semua') {
+        if ($statusFilter === 'jatuh_tempo') {
+            // Belum lunas dan sudah melewati jatuh tempo (definisi yang sama dengan peringatan di Ringkasan).
+            $query->overdue();
+        } elseif ($statusFilter && $statusFilter !== 'semua') {
             $query->where('status', $statusFilter);
         }
 
@@ -75,6 +78,24 @@ class RentManagementController extends Controller
             'menunggu_sum' => (int) $period->open_amount,
             'need_verify'  => RentBill::where('status', 'menunggu')->whereNotNull('payment_proof')->count(),
         ];
+
+        // Tunggakan lintas periode, agar tagihan bulan lalu yang belum lunas tidak "hilang" karena filter bulan.
+        $overdue = RentBill::overdue()
+            ->selectRaw('COUNT(*) as total, COALESCE(SUM(amount), 0) as amount')
+            ->first();
+        $stats['overdue_count'] = (int) $overdue->total;
+        $stats['overdue_sum'] = (int) $overdue->amount;
+
+        // Kartu "Tertunda / Menunggak" = belum lunas di periode ini + tunggakan lewat jatuh tempo dari periode lain.
+        $stats['period_open_sum'] = $stats['menunggu_sum'];
+        $stats['arrears_other_sum'] = ($monthSelected || $yearSelected)
+            ? (int) RentBill::overdue()
+                ->whereNot(fn ($q) => $q
+                    ->when($monthSelected, fn ($q) => $q->where('month', (int) $monthFilter))
+                    ->when($yearSelected, fn ($q) => $q->where('year', (int) $yearFilter)))
+                ->sum('amount')
+            : 0;
+        $stats['menunggu_sum'] = $stats['period_open_sum'] + $stats['arrears_other_sum'];
 
         return view('pengelola.tagihan.index', compact('bills', 'stats', 'monthFilter', 'yearFilter', 'statusFilter', 'search'));
     }

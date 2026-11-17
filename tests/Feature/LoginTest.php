@@ -22,9 +22,9 @@ class LoginTest extends TestCase
 
         // Branding & Hierarchy
         $response->assertSee('Kos Tiana Putra');
-        $response->assertSee('Kopi hangat dan galon sampai depan pintu.');
+        $response->assertSeeText('Kopi hangat dan galon sampai depan pintu.');
         $response->assertSee('Dikelola langsung oleh Pak H. Tiana');
-        $response->assertSee('Warkop buka');
+        $response->assertSee('Kios buka');
 
         // Form Title & Warm Subtitle
         $response->assertSee('Masuk');
@@ -47,7 +47,8 @@ class LoginTest extends TestCase
         $response->assertSee('Pemilik');
         $response->assertSee('Pengelola');
         $response->assertSee('Kelola kamar, tagihan sewa bulanan, dan laporan');
-        $response->assertSee('Warkop');
+        $response->assertSee('Kios');
+        $response->assertDontSee('Warkop');
         $response->assertSee('Petugas');
         $response->assertSee('Antrean tugas, antar galon, dan periksa stok');
         $response->assertSee('A-04');

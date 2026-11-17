@@ -131,7 +131,7 @@ class OrderService
 
             foreach ($stockLogs as &$log) {
                 $log['reference_id'] = $order->id;
-                $log['notes'] = "Pesanan #{$order->order_code} oleh Kamar {$roomNumber}";
+                $log['notes'] = "Pesanan #{$order->order_code} oleh {$roomNumber}";
             }
             unset($log);
             StockLog::insert($stockLogs);

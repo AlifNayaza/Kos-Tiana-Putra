@@ -1,4 +1,4 @@
-@props(['order'])
+@props(['order', 'queueNo' => null])
 
 @php
     $isCash = \App\Models\Order::isCashMethod($order->payment_method);
@@ -15,31 +15,33 @@
     };
 @endphp
 <div data-order-id="{{ $order->id }}" data-order-status="{{ $order->status }}" class="bg-surface rounded-2xl border border-line border-l-[6px] {{ $statusBorder }} p-4 shadow-sm space-y-3 transition-shadow hover:shadow-md">
-    <!-- Baris 1: Nomor Kamar & Status Badge + Indikator Tertunda -->
+    @php $roomShort = trim(str_replace('Kamar', '', $order->room_number)); @endphp
+    <!-- Baris 1: urutan antrean + papan nomor kamar (gaya pintu kos) + status -->
     <div class="flex items-start justify-between gap-2">
-        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
-            <span class="whitespace-nowrap text-lg sm:text-xl font-bold text-ink leading-tight tracking-tight">
-                {{ $order->room_number }}
-            </span>
-            @if($order->is_delayed)
-                <span class="text-2xs font-semibold text-alert">
-                    Tertunda ({{ $order->delayed_duration }})
-                </span>
+        <div class="flex items-center gap-2.5 min-w-0">
+            @if($queueNo)
+                <span class="w-7 h-7 shrink-0 rounded-full bg-brand text-surface font-mono text-xs font-bold flex items-center justify-center"
+                      title="Urutan ke-{{ $queueNo }} (pesanan terlama dikerjakan dulu)">{{ $queueNo }}</span>
             @endif
+            <span class="rounded-md border-2 border-ink/80 bg-surface px-2 font-mono text-lg font-bold leading-7 text-ink tracking-wide">
+                <span class="sr-only">Kamar </span>{{ $roomShort }}
+            </span>
         </div>
-
-        <div>
-            <x-status-badge :status="$order->status" />
-        </div>
+        <x-status-badge :status="$order->status" />
     </div>
 
-    <!-- Baris 2: Nama Pemesan, ID Mono, Waktu Pembuatan -->
-    <div class="text-xs text-ink-soft flex flex-wrap items-center gap-x-2 gap-y-0.5">
-        <span class="font-medium text-ink">{{ $order->user->name ?? 'Penghuni' }}</span>
-        <span class="text-ink-faint">&bull;</span>
-        <span class="font-mono text-ink-soft">#{{ $order->order_code }}</span>
-        <span class="text-ink-faint">&bull;</span>
-        <span>dibuat {{ $order->created_at ? $order->created_at->diffForHumans() : '-' }}</span>
+    <!-- Baris 2: pemesan, lama menunggu (mudah dibaca), kode pesanan -->
+    <div class="text-xs text-ink-soft flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span class="font-semibold text-ink">{{ $order->user->name ?? 'Penghuni' }}</span>
+        @if($order->is_delayed)
+            <span class="inline-flex items-center gap-1 rounded-full bg-alert-wash px-2 py-0.5 font-semibold text-alert">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Menunggu {{ $order->wait_label }}
+            </span>
+        @else
+            <span class="text-ink-soft">masuk {{ $order->wait_label }}{{ $order->wait_label === 'baru saja' ? '' : ' lalu' }}</span>
+        @endif
+        <span class="font-mono text-2xs text-ink-faint">#{{ $order->order_code }}</span>
     </div>
 
     @php

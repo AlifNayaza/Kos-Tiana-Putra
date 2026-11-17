@@ -4,7 +4,7 @@
 @section('page_subtitle', 'Kelola daftar menu makanan, racikan minuman warkop, air galon, dan batas minimum stok')
 
 @section('content')
-<div class="space-y-6" x-data="{ 
+<div class="space-y-6" @if(request()->boolean('baru')) x-init="$nextTick(() => { openCreate() })" @endif x-data="{
     modalOpen: false, 
     isEdit: false,
     formUrl: '',
@@ -141,24 +141,24 @@
     </div>
 
     <!-- Catalog Items Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div class="grid grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
         @forelse($items as $item)
             @php
                 $isLow = $item->stock <= $item->minimum_stock;
                 $isOut = $item->stock <= 0;
             @endphp
-            <div class="bg-surface rounded-2xl border border-line shadow-xs p-5 flex flex-col justify-between hover:border-line transition-colors overflow-hidden">
+            <div class="bg-surface rounded-2xl border border-line shadow-xs p-3 sm:p-5 flex flex-col justify-between hover:border-line transition-colors overflow-hidden">
                 <div>
                     <!-- Foto Menu -->
-                    <div class="-mx-5 -mt-5 mb-4 aspect-[16/9] bg-canvas border-b border-line">
+                    <div class="-mx-3 -mt-3 mb-3 sm:-mx-5 sm:-mt-5 sm:mb-4 aspect-[4/3] sm:aspect-[16/9] bg-canvas border-b border-line">
                         <img src="{{ $item->image_url }}" alt="Foto {{ $item->name }}" loading="lazy" class="w-full h-full object-cover">
                     </div>
 
                     <!-- Header Kartu Menu -->
-                    <div class="flex items-start justify-between">
-                        <div class="flex items-center space-x-3">
-                            <div>
-                                <h3 class="font-bold text-sm text-ink leading-tight">{{ $item->name }}</h3>
+                    <div class="flex flex-col-reverse sm:flex-row items-start sm:justify-between gap-1.5">
+                        <div class="flex items-center space-x-3 min-w-0">
+                            <div class="min-w-0">
+                                <h3 class="font-bold text-sm text-ink leading-tight line-clamp-2">{{ $item->name }}</h3>
                                 <span class="text-2xs font-semibold text-ink-soft uppercase tracking-wider block mt-0.5">
                                     {{ ucfirst($item->category) }}
                                 </span>
@@ -170,20 +170,20 @@
                     </div>
 
                     <!-- Harga & Deskripsi -->
-                    <div class="mt-4 pb-3 border-b border-line">
-                        <div class="text-base font-extrabold text-ink tabular-nums">
+                    <div class="mt-2 pb-2 sm:mt-4 sm:pb-3 border-b border-line">
+                        <div class="text-sm sm:text-base font-extrabold text-ink tabular-nums">
                             {{ $item->formatted_price }}
                             <span class="text-xs font-normal text-ink-soft">/ {{ $item->unit }}</span>
                         </div>
                         @if($item->description)
-                            <p class="text-xs text-ink-soft mt-1 line-clamp-2 leading-relaxed">{{ $item->description }}</p>
+                            <p class="hidden sm:block text-xs text-ink-soft mt-1 line-clamp-2 leading-relaxed">{{ $item->description }}</p>
                         @endif
                     </div>
 
                     <!-- Informasi Stok & Minimum Threshold -->
-                    <div class="mt-3 flex items-center justify-between text-xs">
+                    <div class="mt-2 sm:mt-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-2xs sm:text-xs">
                         <div>
-                            <span class="text-ink-soft">Stok Saat Ini:</span>
+                            <span class="text-ink-soft">Stok<span class="hidden sm:inline"> Saat Ini</span>:</span>
                             <span class="font-extrabold ml-1 tabular-nums {{ $isOut ? 'text-alert' : ($isLow ? 'text-wait' : 'text-ink') }}">
                                 {{ $item->stock }} {{ $item->unit }}
                             </span>
@@ -198,17 +198,17 @@
                             <svg class="w-3.5 h-3.5 text-wait flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                             </svg>
-                            <span>Stok menipis, di bawah batas minimum</span>
+                            <span>Stok menipis<span class="hidden sm:inline">, di bawah batas minimum</span></span>
                         </div>
                     @endif
                 </div>
 
                 <!-- Aksi Edit & Hapus -->
-                <div class="mt-4 pt-3 border-t border-line flex items-center justify-between">
+                <div class="mt-3 sm:mt-4 pt-3 border-t border-line flex flex-wrap items-center justify-between gap-2">
                     <button type="button" 
                             @click="openEdit({{ json_encode($item) }})" 
                             class="text-xs font-semibold text-ink hover:text-brand bg-canvas hover:bg-brand-wash px-3 py-1.5 rounded-lg border border-line transition-colors">
-                        Edit Menu
+                        Edit<span class="hidden sm:inline"> Menu</span>
                     </button>
 
                     <form action="{{ route('pengelola.katalog.destroy', $item->id) }}" method="POST" onsubmit="return confirm('Hapus menu {{ $item->name }} dari katalog?');">

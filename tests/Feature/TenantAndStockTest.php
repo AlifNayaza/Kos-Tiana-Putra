@@ -123,6 +123,25 @@ class TenantAndStockTest extends TestCase
         $this->assertSame(1, StockLog::where('type', 'in')->count());
     }
 
+    public function test_stock_page_explains_actions_and_logs_use_clear_labels(): void
+    {
+        $petugas = $this->makeUser('petugas');
+        $item = $this->makeItem(['stock' => 5]);
+        $this->actingAs($petugas);
+
+        $this->post(route('petugas.stocks.adjust'), ['catalog_item_id' => $item->id, 'type' => 'in', 'quantity' => 3, 'notes' => 'Kiriman agen'])
+            ->assertSessionHas('success', "Stok {$item->name} bertambah 3 {$item->unit}. Sekarang 8 {$item->unit}.");
+        $this->post(route('petugas.stocks.adjust'), ['catalog_item_id' => $item->id, 'type' => 'out', 'quantity' => 1, 'notes' => 'Bocor / pecah']);
+
+        $this->assertSame(['Barang datang', 'Rusak / hilang'], StockLog::orderBy('id')->get()->pluck('reference_label')->all());
+
+        $this->get(route('petugas.stocks.index'))
+            ->assertOk()
+            ->assertSee('Kapan pakai tombol apa?')
+            ->assertSee('Hitung ulang')
+            ->assertSee('Barang datang');
+    }
+
     public function test_stock_opname_uses_the_current_stock_not_the_value_shown_on_screen(): void
     {
         $petugas = $this->makeUser('petugas');

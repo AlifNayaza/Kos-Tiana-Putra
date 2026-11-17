@@ -147,7 +147,7 @@
     </div>
 
     <!-- Room Cards Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+    <div class="grid grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-5">
         @forelse($rooms as $room)
             @php
                 $statusColor = match($room->status) {
@@ -158,81 +158,81 @@
                 };
                 $tenant = $room->activeTenantProfile;
             @endphp
-            <div class="bg-surface rounded-2xl border border-line shadow-xs p-5 flex flex-col justify-between hover:border-brand/40 transition-colors overflow-hidden">
+            <div class="bg-surface rounded-2xl border border-line shadow-xs p-3 sm:p-5 flex flex-col justify-between hover:border-brand/40 transition-colors overflow-hidden">
                 <div>
                     <!-- Foto Kamar -->
-                    <div class="-mx-5 -mt-5 mb-4 aspect-[16/9] bg-canvas border-b border-line">
+                    <div class="-mx-3 -mt-3 mb-3 sm:-mx-5 sm:-mt-5 sm:mb-4 aspect-[4/3] sm:aspect-[16/9] bg-canvas border-b border-line">
                         <img src="{{ $room->image_url }}" alt="Foto {{ $room->room_number }}" loading="lazy" class="w-full h-full object-cover">
                     </div>
 
                     <!-- Card Top Header -->
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <div class="flex items-center space-x-2">
-                                <h3 class="text-base font-bold text-ink tracking-tight">{{ $room->room_number }}</h3>
+                    <div class="flex flex-col-reverse sm:flex-row items-start sm:justify-between gap-1.5">
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                <h3 class="text-sm sm:text-base font-bold text-ink tracking-tight">{{ $room->room_number }}</h3>
                                 <span class="text-2xs font-semibold text-ink-soft bg-canvas px-2 py-0.5 rounded-md">
                                     Lt. {{ $room->floor }}
                                 </span>
                             </div>
-                            <p class="text-xs text-ink-soft mt-0.5 font-medium">{{ $room->type }} {{ $room->size ? '• ' . $room->size : '' }}</p>
+                            <p class="text-2xs sm:text-xs text-ink-soft mt-0.5 font-medium line-clamp-2">{{ $room->type }} {{ $room->size ? '• ' . $room->size : '' }}</p>
                         </div>
 
                         <x-status-badge :status="$statusColor['status']" :label="$statusColor['label']" />
                     </div>
 
                     <!-- Price Tag -->
-                    <div class="mt-4 pb-4 border-b border-line">
-                        <div class="text-lg font-extrabold text-ink tabular-nums">
+                    <div class="mt-2 pb-2 sm:mt-4 sm:pb-4 border-b border-line">
+                        <div class="text-sm sm:text-lg font-extrabold text-ink tabular-nums">
                             {{ $room->formatted_price }}
                             <span class="text-xs font-normal text-ink-soft">/ bulan</span>
                         </div>
                     </div>
 
                     <!-- Occupant Info / Available status -->
-                    <div class="py-3 border-b border-line text-xs">
+                    <div class="py-2 sm:py-3 border-b border-line text-2xs sm:text-xs">
                         @if($room->status === 'terisi' && $tenant)
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center space-x-2">
-                                    <div class="w-7 h-7 rounded-full bg-brand-wash text-brand font-bold flex items-center justify-center text-2xs">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <div class="w-7 h-7 flex-shrink-0 rounded-full bg-brand-wash text-brand font-bold flex items-center justify-center text-2xs">
                                         {{ substr($tenant->user->name ?? 'P', 0, 1) }}
                                     </div>
-                                    <div>
-                                        <p class="font-bold text-ink leading-tight">{{ $tenant->user->name ?? 'Penghuni' }}</p>
+                                    <div class="min-w-0">
+                                        <p class="font-bold text-ink leading-tight truncate">{{ $tenant->user->name ?? 'Penghuni' }}</p>
                                         <p class="text-2xs text-ink-soft">{{ $tenant->user->phone ?? '-' }}</p>
                                     </div>
                                 </div>
-                                <span class="text-2xs text-ink-faint font-medium">Huni sejak {{ \Carbon\Carbon::parse($tenant->start_date)->format('d M Y') }}</span>
+                                <span class="hidden sm:inline text-2xs text-ink-faint font-medium">Huni sejak {{ \Carbon\Carbon::parse($tenant->start_date)->format('d M Y') }}</span>
                             </div>
                         @elseif($room->status === 'perbaikan')
                             <div class="flex items-center space-x-2 text-wait">
                                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                                 </svg>
-                                <span class="font-medium text-xs">Sedang dalam proses perbaikan / renovasi</span>
+                                <span class="font-medium">Sedang dalam perbaikan<span class="hidden sm:inline"> / renovasi</span></span>
                             </div>
                         @else
                             <div class="flex items-center space-x-2 text-brand font-medium">
                                 <svg class="w-4 h-4 flex-shrink-0 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                                 </svg>
-                                <span>Kamar kosong, siap dialokasikan untuk penghuni baru</span>
+                                <span>Kamar kosong<span class="hidden sm:inline">, siap dialokasikan untuk penghuni baru</span></span>
                             </div>
                         @endif
                     </div>
 
                     <!-- Facilities List -->
-                    <div class="mt-3">
-                        <p class="text-2xs font-semibold text-ink-faint uppercase tracking-wider mb-1.5">Fasilitas</p>
-                        <p class="text-xs text-ink-soft leading-relaxed">{{ $room->facilities }}</p>
+                    <div class="mt-2 sm:mt-3">
+                        <p class="text-2xs font-semibold text-ink-faint uppercase tracking-wider mb-1 sm:mb-1.5">Fasilitas</p>
+                        <p class="text-2xs sm:text-xs text-ink-soft leading-relaxed line-clamp-2 sm:line-clamp-none">{{ $room->facilities }}</p>
                     </div>
                 </div>
 
                 <!-- Card Actions -->
-                <div class="mt-5 pt-4 border-t border-line flex items-center justify-between">
+                <div class="mt-3 pt-3 sm:mt-5 sm:pt-4 border-t border-line flex flex-wrap items-center justify-between gap-2">
                     <button type="button" 
                             @click="openEdit({{ json_encode($room) }})" 
                             class="text-xs font-semibold text-ink hover:text-brand bg-canvas hover:bg-brand-wash px-3 py-1.5 rounded-lg border border-line hover:border-brand/30 transition-colors">
-                        Edit Informasi
+                        Edit<span class="hidden sm:inline"> Informasi</span>
                     </button>
 
                     @if($room->status !== 'terisi')
@@ -245,7 +245,7 @@
                         </form>
                     @else
                         <span class="text-2xs text-ink-faint font-medium" title="Kamar terisi tidak dapat dihapus">
-                            Terkunci (Terisi)
+                            Terkunci
                         </span>
                     @endif
                 </div>

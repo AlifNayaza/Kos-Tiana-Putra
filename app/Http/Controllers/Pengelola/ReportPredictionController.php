@@ -142,7 +142,7 @@ class ReportPredictionController extends Controller
         $shoppingChecklist = $predictions->filter(fn($p) => $p->recommended_restock_qty > 0)
             ->sortBy(fn($p) => $p->status === 'kritis' ? 0 : 1);
 
-        // Format teks WhatsApp siap salin ke agen galon / staf warkop
+        // Format teks WhatsApp siap salin ke agen galon / petugas kios
         $waLines = [];
         $waLines[] = "*DAFTAR BELANJA KOS TIANA PUTRA 1*";
         $waLines[] = "Tanggal: " . Carbon::now()->translatedFormat('d F Y');
@@ -170,16 +170,29 @@ class ReportPredictionController extends Controller
         $waLines[] = "_Dihitung otomatis berdasarkan rata-rata pesanan penghuni Kos Tiana Putra 1_";
         $waShoppingText = implode("\n", $waLines);
 
-        // Data Grafik Horizontal Bar Chart (Chart.js)
-        $chartPayload = [
-            'labels'         => $predictions->map(fn($p) => $p->catalogItem?->name ?? 'Item')->values(),
-            'currentStock'   => $predictions->map(fn($p) => $p->current_stock)->values(),
-            'targetStock'    => $predictions->map(fn($p) => $p->target_stock)->values(),
-            'predictedDemand'=> $predictions->map(fn($p) => $p->predicted_demand_qty)->values(),
-            'restockQty'     => $predictions->map(fn($p) => $p->recommended_restock_qty)->values(),
-            'daysOfSupply'   => $predictions->map(fn($p) => $p->days_of_supply)->values(),
-            'units'          => $predictions->map(fn($p) => $p->catalogItem?->unit ?? '')->values(),
-            'statuses'       => $predictions->map(fn($p) => $p->status)->values(),
+        // Jejak data yang dipelajari model: total barang terjual per hari, 30 hari terakhir
+        // (sumber sama dengan skrip Python: pesanan berstatus selesai). Satu query teragregasi.
+        $from = Carbon::now()->subDays(29)->startOfDay();
+        $soldPerDay = OrderItem::query()
+            ->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->where('orders.status', 'selesai')
+            ->where('orders.created_at', '>=', $from)
+            ->selectRaw('DATE(orders.created_at) as d, SUM(order_items.quantity) as q')
+            ->groupBy('d')
+            ->pluck('q', 'd');
+        $history = collect(range(29, 0))
+            ->map(fn ($i) => (int) ($soldPerDay[Carbon::now()->subDays($i)->toDateString()] ?? 0))
+            ->values();
+
+        // Akurasi = rata-rata skor uji mundur model, hanya untuk barang yang datanya cukup untuk diuji.
+        $scored = $predictions->filter(fn ($p) => (float) $p->confidence_score > 0);
+        $mlInfo = [
+            'history'        => $history,
+            'forecast_daily' => round($predictions->sum('predicted_demand_qty') / 7, 1),
+            'accuracy'       => $scored->isNotEmpty() ? (int) round($scored->avg('confidence_score') * 100) : null,
+            'tested_items'   => $scored->count(),
+            'trend_up'       => $predictions->where('sales_trend', 'naik')->count(),
+            'trend_down'     => $predictions->where('sales_trend', 'turun')->count(),
         ];
 
         $stats = [
@@ -202,7 +215,7 @@ class ReportPredictionController extends Controller
             'stats',
             'shoppingChecklist',
             'waShoppingText',
-            'chartPayload'
+            'mlInfo'
         ));
     }
 

@@ -79,7 +79,9 @@
     <div class="flex items-center justify-between pb-1">
         <div>
             <h1 class="text-3xl text-brand-deep leading-tight">Antrean</h1>
-            <p class="text-2xs text-ink-faint mt-0.5">
+            <p class="text-xs text-ink-soft mt-0.5">
+                <b class="text-ink">{{ $orders->count() }} pesanan aktif</b>
+                <span class="text-ink-faint">·</span>
                 <span x-text="'diperbarui ' + secondsAgo + ' detik lalu'"></span>
                 <span x-show="isRefreshing" class="text-brand font-semibold ml-1 animate-pulse">Menyinkronkan...</span>
             </p>
@@ -100,49 +102,36 @@
     <!-- ============================================================== -->
     <!-- 2. FILTER STATUS, TOGGLE GALON, & TAUTAN SELESAI HARI INI     -->
     <!-- ============================================================== -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1">
-        <!-- Filter Tabs Horizontal (Bisa digeser di mobile) -->
-        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-            <button type="button" 
-                    @click="activeFilter = 'semua'"
-                    :class="activeFilter === 'semua' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
-                    class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
-                Semua ({{ $orders->count() }})
-            </button>
-            <button type="button" 
-                    @click="activeFilter = 'menunggu'"
-                    :class="activeFilter === 'menunggu' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
-                    class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
-                Menunggu ({{ $metrics['menunggu'] }})
-            </button>
-            <button type="button" 
-                    @click="activeFilter = 'diproses'"
-                    :class="activeFilter === 'diproses' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
-                    class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
-                Diproses ({{ $metrics['diproses'] }})
-            </button>
-            <button type="button" 
-                    @click="activeFilter = 'diantar'"
-                    :class="activeFilter === 'diantar' ? 'bg-brand text-surface font-bold border border-brand shadow-xs' : 'bg-surface border border-line text-ink-soft hover:bg-canvas font-medium'"
-                    class="min-h-[44px] px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap">
-                Diantar ({{ $metrics['diantar'] }})
-            </button>
+    <div class="space-y-2.5">
+        <!-- Status sebagai 4 kotak sejajar: tidak perlu digeser, angka besar mudah dibaca -->
+        <div class="grid grid-cols-4 gap-1.5 sm:gap-2 lg:max-w-2xl" role="tablist" aria-label="Saring status pesanan">
+            @foreach([
+                'semua'    => ['Semua',    $orders->count(),       'bg-ink'],
+                'menunggu' => ['Menunggu', $metrics['menunggu'],   'bg-wait'],
+                'diproses' => ['Diproses', $metrics['diproses'],   'bg-process'],
+                'diantar'  => ['Diantar',  $metrics['diantar'],    'bg-brand'],
+            ] as $key => [$label, $count, $dot])
+                <button type="button" role="tab" @click="activeFilter = '{{ $key }}'" :aria-selected="activeFilter === '{{ $key }}'"
+                        :class="activeFilter === '{{ $key }}' ? 'bg-brand text-surface border-brand shadow-xs' : 'bg-surface text-ink border-line hover:bg-canvas'"
+                        class="min-h-[60px] rounded-2xl border px-1 py-2 flex flex-col items-center justify-center gap-0.5 transition-colors">
+                    <span class="font-display text-xl font-bold leading-none tabular-nums">{{ $count }}</span>
+                    <span class="flex items-center gap-1 text-[11px] font-semibold"
+                          :class="activeFilter === '{{ $key }}' ? 'text-surface/90' : 'text-ink-soft'">
+                        @if($key !== 'semua')<span class="w-1.5 h-1.5 rounded-full {{ $dot }}"></span>@endif{{ $label }}
+                    </span>
+                </button>
+            @endforeach
         </div>
 
-        <!-- Bagian Kanan: Toggle Galon Saja & Tautan Selesai Hari Ini -->
-        <div class="flex items-center justify-between sm:justify-end gap-3 text-xs">
-            <!-- Toggle Galon Saja (Terpisah, bukan chip status) -->
-            <label class="inline-flex items-center gap-2 font-medium text-ink-soft cursor-pointer min-h-[44px] px-2 select-none">
-                <input type="checkbox" 
-                       x-model="onlyGalon" 
-                       class="w-4 h-4 rounded border-line text-brand focus:ring-brand focus:ring-offset-0">
+        <div class="flex items-center justify-between gap-3 text-xs">
+            <label class="inline-flex items-center gap-2 font-medium text-ink-soft cursor-pointer min-h-[44px] select-none">
+                <input type="checkbox" x-model="onlyGalon" class="w-[18px] h-[18px] rounded border-line text-brand focus:ring-brand focus:ring-offset-0">
                 <span>Galon saja</span>
             </label>
-
-            <!-- Tautan Ringkas ke Riwayat -->
-            <a href="{{ route('petugas.history') }}" 
-               class="text-ink-faint hover:text-brand font-medium whitespace-nowrap min-h-[44px] flex items-center transition-colors">
-                <span>Selesai hari ini: <strong class="text-ink font-semibold tabular-nums">{{ $metrics['selesai'] }}</strong></span>
+            <a href="{{ route('petugas.history') }}"
+               class="inline-flex items-center gap-1.5 min-h-[36px] rounded-full border border-line bg-surface px-3 text-ink-soft hover:text-brand transition-colors">
+                <span class="w-1.5 h-1.5 rounded-full bg-done"></span>
+                Selesai hari ini <strong class="text-ink tabular-nums">{{ $metrics['selesai'] }}</strong>
             </a>
         </div>
     </div>
@@ -178,7 +167,7 @@
                         @php $menungguOrders = $orders->where('status', 'menunggu'); @endphp
                         @forelse($menungguOrders as $order)
                             <div x-show="!onlyGalon || {{ $order->has_galon ? 'true' : 'false' }}">
-                                @include('petugas.partials.order-card', ['order' => $order])
+                                @include('petugas.partials.order-card', ['order' => $order, 'queueNo' => $loop->iteration])
                             </div>
                         @empty
                             <p class="text-xs text-ink-faint p-4 text-center bg-surface rounded-xl border border-line">Kosong</p>
@@ -200,7 +189,7 @@
                         @php $diprosesOrders = $orders->where('status', 'diproses'); @endphp
                         @forelse($diprosesOrders as $order)
                             <div x-show="!onlyGalon || {{ $order->has_galon ? 'true' : 'false' }}">
-                                @include('petugas.partials.order-card', ['order' => $order])
+                                @include('petugas.partials.order-card', ['order' => $order, 'queueNo' => $loop->iteration])
                             </div>
                         @empty
                             <p class="text-xs text-ink-faint p-4 text-center bg-surface rounded-xl border border-line">Kosong</p>
@@ -222,7 +211,7 @@
                         @php $diantarOrders = $orders->where('status', 'diantar'); @endphp
                         @forelse($diantarOrders as $order)
                             <div x-show="!onlyGalon || {{ $order->has_galon ? 'true' : 'false' }}">
-                                @include('petugas.partials.order-card', ['order' => $order])
+                                @include('petugas.partials.order-card', ['order' => $order, 'queueNo' => $loop->iteration])
                             </div>
                         @empty
                             <p class="text-xs text-ink-faint p-4 text-center bg-surface rounded-xl border border-line">Kosong</p>
@@ -239,7 +228,7 @@
             <div class="block lg:hidden space-y-3">
                 @foreach($orders as $order)
                     <div x-show="matches('{{ $order->status }}', {{ $order->has_galon ? 'true' : 'false' }})">
-                        @include('petugas.partials.order-card', ['order' => $order])
+                        @include('petugas.partials.order-card', ['order' => $order, 'queueNo' => $loop->iteration])
                     </div>
                 @endforeach
             </div>

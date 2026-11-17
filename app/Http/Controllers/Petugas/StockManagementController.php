@@ -85,13 +85,14 @@ class StockManagementController extends Controller
             } else {
                 $type = $request->input('type');
                 $qty = (int) $request->input('quantity');
-                $referenceType = 'manual_adjustment';
+                // Barang datang dicatat sebagai restock, barang keluar manual sebagai rusak / hilang.
+                $referenceType = $type === 'in' ? 'manual_restock' : 'stock_damage';
             }
 
             if ($type === 'out') {
                 if ($catalogItem->stock < $qty) {
                     throw ValidationException::withMessages([
-                        'quantity' => "Pengurangan gagal: Stok {$catalogItem->name} saat ini hanya tersisa {$catalogItem->stock} {$catalogItem->unit} (tidak boleh negatif).",
+                        'quantity' => "Tidak bisa mengurangi {$qty} {$catalogItem->unit}: stok {$catalogItem->name} sekarang hanya {$catalogItem->stock} {$catalogItem->unit}.",
                     ]);
                 }
                 $afterStock = $beforeStock - $qty;
@@ -116,19 +117,22 @@ class StockManagementController extends Controller
             return ['item' => $catalogItem, 'type' => $type, 'qty' => $qty, 'delta' => $type === 'in' ? $qty : -$qty, 'after_stock' => $afterStock, 'opname' => $isOpname];
         });
 
+        $name = $result['item']->name;
+        $unit = $result['item']->unit;
+
         if ($result['type'] === 'opname') {
             return redirect()->back()
-                ->with('info', "Stok \"{$result['item']->name}\" sudah sesuai hitung fisik ({$result['after_stock']} {$result['item']->unit}); tidak ada perubahan.");
+                ->with('info', "Jumlah {$name} sudah cocok ({$result['after_stock']} {$unit}). Tidak ada yang diubah.");
         }
 
         if (!empty($result['opname'])) {
-            $sign = $result['delta'] > 0 ? '+' : '';
+            $before = $result['after_stock'] - $result['delta'];
             return redirect()->back()
-                ->with('success', "Stock opname \"{$result['item']->name}\" tercatat: selisih {$sign}{$result['delta']} {$result['item']->unit}. Stok aktual sekarang {$result['after_stock']} {$result['item']->unit}.");
+                ->with('success', "Stok {$name} disesuaikan dengan hasil hitung: {$before} jadi {$result['after_stock']} {$unit}.");
         }
 
-        $typeLabel = $result['type'] === 'in' ? 'penambahan (+)' : 'pengurangan (-)';
+        $verb = $result['type'] === 'in' ? 'bertambah' : 'berkurang';
         return redirect()->back()
-            ->with('success', "Mutasi {$typeLabel} {$result['qty']} {$result['item']->unit} untuk \"{$result['item']->name}\" berhasil dicatat. Sisa stok aktual: {$result['after_stock']} {$result['item']->unit}.");
+            ->with('success', "Stok {$name} {$verb} {$result['qty']} {$unit}. Sekarang {$result['after_stock']} {$unit}.");
     }
 }
