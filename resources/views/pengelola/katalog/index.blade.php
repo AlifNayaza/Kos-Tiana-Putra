@@ -16,7 +16,11 @@
         minimum_stock: 5,
         unit: 'porsi',
         description: '',
-        is_available: true
+        is_available: true,
+        image_url: '',
+        has_image: false,
+        preview: null,
+        remove_image: false
     },
     openCreate() {
         this.isEdit = false;
@@ -29,7 +33,11 @@
             minimum_stock: 5,
             unit: 'porsi',
             description: '',
-            is_available: true
+            is_available: true,
+            image_url: '',
+            has_image: false,
+            preview: null,
+            remove_image: false
         };
         this.modalOpen = true;
     },
@@ -44,7 +52,11 @@
             minimum_stock: item.minimum_stock,
             unit: item.unit,
             description: item.description || '',
-            is_available: Boolean(item.is_available)
+            is_available: Boolean(item.is_available),
+            image_url: item.image_url,
+            has_image: Boolean(item.image),
+            preview: null,
+            remove_image: false
         };
         this.modalOpen = true;
     }
@@ -135,26 +147,16 @@
                 $isLow = $item->stock <= $item->minimum_stock;
                 $isOut = $item->stock <= 0;
             @endphp
-            <div class="bg-surface rounded-2xl border border-line shadow-xs p-5 flex flex-col justify-between hover:border-line transition-colors">
+            <div class="bg-surface rounded-2xl border border-line shadow-xs p-5 flex flex-col justify-between hover:border-line transition-colors overflow-hidden">
                 <div>
+                    <!-- Foto Menu -->
+                    <div class="-mx-5 -mt-5 mb-4 aspect-[16/9] bg-canvas border-b border-line">
+                        <img src="{{ $item->image_url }}" alt="Foto {{ $item->name }}" loading="lazy" class="w-full h-full object-cover">
+                    </div>
+
                     <!-- Header Kartu Menu -->
                     <div class="flex items-start justify-between">
                         <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-xl bg-canvas flex items-center justify-center text-lg flex-shrink-0 border border-line text-brand">
-                                @if($item->category === 'galon')
-                                    <svg class="w-5 h-5 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
-                                    </svg>
-                                @elseif($item->category === 'makanan')
-                                    <svg class="w-5 h-5 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                                    </svg>
-                                @else
-                                    <svg class="w-5 h-5 text-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/>
-                                    </svg>
-                                @endif
-                            </div>
                             <div>
                                 <h3 class="font-bold text-sm text-ink leading-tight">{{ $item->name }}</h3>
                                 <span class="text-2xs font-semibold text-ink-soft uppercase tracking-wider block mt-0.5">
@@ -247,7 +249,7 @@
                     </button>
                 </div>
 
-                <form :action="formUrl" method="POST" class="mt-4 space-y-4" data-restore="katalog" data-open-var="modalOpen" data-url-var="formUrl" data-edit-var="isEdit">
+                <form :action="formUrl" method="POST" enctype="multipart/form-data" class="mt-4 space-y-4" data-restore="katalog" data-open-var="modalOpen" data-url-var="formUrl" data-edit-var="isEdit">
                     @csrf
                     <input type="hidden" name="_restore" value="katalog">
                     <input type="hidden" name="_action" :value="formUrl">
@@ -314,6 +316,8 @@
                                class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
                         <x-field-error name="description" />
                     </div>
+
+                    <x-image-input form="itemForm" label="Foto Menu" placeholder="'{{ asset('images/placeholders') }}/' + itemForm.category + '.svg'" />
 
                     <div class="flex items-center space-x-2 pt-2">
                         <input type="checkbox" name="is_available" id="is_available" value="1" x-model="itemForm.is_available" 

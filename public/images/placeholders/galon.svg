@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-label="Ilustrasi galon air minum">
+  <!-- Latar -->
+  <rect width="800" height="450" fill="#dcebe7"/>
+  <rect y="380" width="800" height="70" fill="#bdd6cf"/>
+  <g fill="#c7e0d9">
+    <path d="M110 120 q-26 36 -26 56 a26 26 0 0 0 52 0 q0 -20 -26 -56 Z"/>
+    <path d="M690 210 q-20 28 -20 44 a20 20 0 0 0 40 0 q0 -16 -20 -44 Z"/>
+    <path d="M650 80 q-14 20 -14 30 a14 14 0 0 0 28 0 q0 -10 -14 -30 Z"/>
+  </g>
+
+  <!-- Bayangan -->
+  <ellipse cx="400" cy="388" rx="150" ry="16" fill="#9fc2b8"/>
+
+  <!-- Galon 19L -->
+  <rect x="372" y="34" width="56" height="30" rx="6" fill="#2f5486"/>
+  <rect x="380" y="60" width="40" height="18" fill="#9ccbe0"/>
+  <path d="M300 120 q0 -42 50 -42 h100 q50 0 50 42 v230 q0 32 -32 32 h-136 q-32 0 -32 -32 Z" fill="#9ccbe0"/>
+  <path d="M300 120 q0 -42 50 -42 h100 q50 0 50 42 v230 q0 32 -32 32 h-136 q-32 0 -32 -32 Z" fill="none" stroke="#6fa9c4" stroke-width="4"/>
+  <!-- Rusuk galon -->
+  <g fill="#86bdd5">
+    <rect x="300" y="150" width="200" height="14"/>
+    <rect x="300" y="318" width="200" height="14"/>
+  </g>
+  <!-- Air -->
+  <path d="M302 180 q50 -12 98 0 t98 0 v170 q0 30 -30 30 h-136 q-30 0 -30 -30 Z" fill="#6fa9c4" opacity="0.6"/>
+  <!-- Label -->
+  <rect x="330" y="200" width="140" height="90" rx="10" fill="#fffefb"/>
+  <path d="M400 214 q-20 26 -20 40 a20 20 0 0 0 40 0 q0 -14 -20 -40 Z" fill="#006059"/>
+  <rect x="352" y="274" width="96" height="6" rx="3" fill="#006059" opacity="0.5"/>
+  <!-- Kilau -->
+  <path d="M322 110 q4 -20 24 -22" stroke="#fffefb" stroke-width="8" fill="none" stroke-linecap="round" opacity="0.8"/>
+  <rect x="316" y="180" width="8" height="120" rx="4" fill="#fffefb" opacity="0.6"/>
+
+  <!-- Gelas air -->
+  <ellipse cx="590" cy="384" rx="52" ry="8" fill="#9fc2b8"/>
+  <path d="M548 270 h84 l-10 108 q-1 8 -9 8 h-56 q-8 0 -9 -8 Z" fill="#fffefb" opacity="0.7"/>
+  <path d="M552 300 h76 l-7 76 q-1 6 -7 6 h-48 q-6 0 -7 -6 Z" fill="#9ccbe0"/>
+  <path d="M552 300 q19 -6 38 0 t38 0" stroke="#6fa9c4" stroke-width="3" fill="none"/>
+</svg>

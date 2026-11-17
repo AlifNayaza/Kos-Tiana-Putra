@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\ImageUpload;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -20,7 +21,10 @@ class Room extends Model
         'status',
         'size',
         'description',
+        'image',
     ];
+
+    protected $appends = ['image_url'];
 
     protected function casts(): array
     {
@@ -58,5 +62,11 @@ class Room extends Model
     public function getFormattedPriceAttribute(): string
     {
         return 'Rp ' . number_format($this->monthly_price, 0, ',', '.');
+    }
+
+    /** Foto kamar, atau placeholder kamar bila belum diunggah. */
+    public function getImageUrlAttribute(): string
+    {
+        return ImageUpload::url($this->image, 'kamar');
     }
 }

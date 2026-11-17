@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\ImageUpload;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -22,6 +23,8 @@ class CatalogItem extends Model
         'image',
         'is_available',
     ];
+
+    protected $appends = ['image_url'];
 
     protected $casts = [
         'price' => 'integer',
@@ -99,5 +102,11 @@ class CatalogItem extends Model
     public function getFormattedPriceAttribute(): string
     {
         return 'Rp ' . number_format($this->price, 0, ',', '.');
+    }
+
+    /** Foto menu, atau placeholder sesuai kategori (makanan/minuman/galon) bila belum diunggah. */
+    public function getImageUrlAttribute(): string
+    {
+        return ImageUpload::url($this->image, $this->category ?: 'makanan');
     }
 }

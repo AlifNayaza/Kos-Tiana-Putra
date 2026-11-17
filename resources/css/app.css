@@ -535,6 +535,7 @@ textarea {
 .cat-tile[data-cat='makanan'] { background: var(--color-ochre-wash); color: var(--color-ochre-ink); }
 .cat-tile[data-cat='minuman'] { background: var(--color-process-wash); color: var(--color-process); }
 .cat-tile[data-cat='galon'] { background: var(--color-brand-wash); color: var(--color-brand); }
+.cat-tile--photo { width: 4rem; height: 4rem; overflow: hidden; border: 1px solid var(--color-line); }
 
 /* Tombol yang sedang memproses (dikunci agar tidak terkirim dua kali) */
 button[aria-busy='true'],

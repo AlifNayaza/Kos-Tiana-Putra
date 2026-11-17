@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Pengelola;
 use App\Http\Controllers\Controller;
 use App\Models\CatalogItem;
 use App\Models\StockLog;
+use App\Support\ImageUpload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -63,9 +64,11 @@ class CatalogManagementController extends Controller
             'unit'          => ['required', 'string', 'max:50'],
             'description'   => ['nullable', 'string'],
             'is_available'  => ['nullable', 'boolean'],
+            'image'         => ImageUpload::rules(),
         ]);
 
         $validated['is_available'] = $request->boolean('is_available', true);
+        $validated['image'] = ImageUpload::resolve($request, 'catalog', null);
 
         DB::transaction(function () use ($validated) {
             $item = CatalogItem::create($validated);
@@ -102,9 +105,11 @@ class CatalogManagementController extends Controller
             'unit'          => ['required', 'string', 'max:50'],
             'description'   => ['nullable', 'string'],
             'is_available'  => ['nullable', 'boolean'],
+            'image'         => ImageUpload::rules(),
         ]);
 
         $validated['is_available'] = $request->boolean('is_available', true);
+        $validated['image'] = ImageUpload::resolve($request, 'catalog', $katalog->image);
 
         $katalog->update($validated);
 

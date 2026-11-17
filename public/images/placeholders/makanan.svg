@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-label="Ilustrasi makanan">
+  <!-- Latar & taplak -->
+  <rect width="800" height="450" fill="#f7ecd6"/>
+  <g fill="#efdcb6">
+    <circle cx="80" cy="70" r="26"/>
+    <circle cx="720" cy="380" r="34"/>
+    <circle cx="700" cy="70" r="16"/>
+    <circle cx="110" cy="390" r="18"/>
+  </g>
+
+  <!-- Piring -->
+  <ellipse cx="400" cy="250" rx="230" ry="150" fill="#d9c49c" opacity="0.5"/>
+  <ellipse cx="400" cy="240" rx="220" ry="140" fill="#fffefb"/>
+  <ellipse cx="400" cy="240" rx="180" ry="112" fill="#f3f1ea"/>
+
+  <!-- Nasi / mie goreng -->
+  <path d="M260 250 q10 -80 90 -92 q70 -16 120 20 q70 30 70 80 q-20 50 -140 54 q-130 0 -140 -62 Z" fill="#c98a2b"/>
+  <g stroke="#a86b14" stroke-width="5" fill="none" stroke-linecap="round">
+    <path d="M290 230 q30 -30 60 -6 t60 -10"/>
+    <path d="M300 262 q40 -22 80 0 t80 -6"/>
+    <path d="M340 200 q30 -20 60 0 t70 6"/>
+    <path d="M420 280 q30 -16 60 -2"/>
+  </g>
+  <!-- Sayur & topping -->
+  <g fill="#3a6b46">
+    <circle cx="320" cy="210" r="7"/>
+    <circle cx="470" cy="236" r="6"/>
+    <circle cx="380" cy="280" r="6"/>
+    <circle cx="500" cy="270" r="5"/>
+  </g>
+  <g fill="#a3341c">
+    <circle cx="350" cy="250" r="5"/>
+    <circle cx="440" cy="200" r="5"/>
+    <circle cx="300" cy="262" r="4"/>
+  </g>
+
+  <!-- Telur ceplok -->
+  <path d="M400 150 q50 -14 80 14 q30 30 4 56 q-30 22 -70 12 q-46 -10 -44 -46 q2 -28 30 -36 Z" fill="#fffefb"/>
+  <circle cx="436" cy="190" r="22" fill="#f2b632"/>
+  <circle cx="430" cy="184" r="7" fill="#f8d77a"/>
+
+  <!-- Kerupuk -->
+  <path d="M520 190 q30 -20 56 4 q10 24 -16 36 q-30 8 -44 -12 q-8 -14 4 -28 Z" fill="#f3e3b8"/>
+  <g fill="#e2cb8f"><circle cx="540" cy="200" r="3"/><circle cx="556" cy="214" r="3"/><circle cx="548" cy="226" r="2"/></g>
+
+  <!-- Sendok & garpu -->
+  <rect x="660" y="130" width="12" height="220" rx="6" fill="#9aa5a1"/>
+  <ellipse cx="666" cy="120" rx="22" ry="34" fill="#b9c2bf"/>
+  <rect x="118" y="160" width="12" height="190" rx="6" fill="#9aa5a1"/>
+  <path d="M104 80 v70 q0 18 20 18 q20 0 20 -18 v-70" fill="none" stroke="#b9c2bf" stroke-width="8" stroke-linecap="round"/>
+  <line x1="124" y1="80" x2="124" y2="140" stroke="#b9c2bf" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- Uap -->
+  <g stroke="#c9b48a" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.8">
+    <path d="M350 120 q-14 -20 0 -40 t0 -40"/>
+    <path d="M400 110 q-14 -20 0 -40 t0 -40"/>
+    <path d="M450 120 q-14 -20 0 -40 t0 -40"/>
+  </g>
+</svg>

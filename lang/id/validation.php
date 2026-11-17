@@ -92,6 +92,7 @@ return [
         'minimum_stock' => 'Stok minimum',
         'unit' => 'Satuan',
         'is_available' => 'Ketersediaan',
+        'image' => 'Foto',
         'month' => 'Bulan',
         'year' => 'Tahun',
         'due_date' => 'Tanggal jatuh tempo',

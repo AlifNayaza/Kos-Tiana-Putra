@@ -203,14 +203,8 @@
                             @foreach($catItems as $item)
                                 <div x-show="matchesFilter('{{ $item->category }}', '{{ addslashes($item->name) }}')"
                                      class="bg-surface rounded-2xl border border-line p-3 sm:p-3.5 flex items-center gap-3 shadow-sm hover:shadow-md hover:border-brand/40 transition-all">
-                                    <span class="cat-tile" data-cat="{{ $item->category }}" aria-hidden="true">
-                                        @if($item->category === 'minuman')
-                                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 4h10l-1.2 15.2a1 1 0 01-1 .8H9.2a1 1 0 01-1-.8L7 4zM7.6 10h8.8"/></svg>
-                                        @elseif($item->category === 'galon')
-                                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3.5c-3 4-5 6.5-5 9a5 5 0 0010 0c0-2.5-2-5-5-9z"/></svg>
-                                        @else
-                                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 12h16a8 8 0 01-16 0zM8 8c0-1.5 1-1.5 1-3M12 8c0-1.5 1-1.5 1-3M16 8c0-1.5 1-1.5 1-3"/></svg>
-                                        @endif
+                                    <span class="cat-tile cat-tile--photo" data-cat="{{ $item->category }}" aria-hidden="true">
+                                        <img src="{{ $item->image_url }}" alt="" loading="lazy" class="w-full h-full object-cover">
                                     </span>
                                     <div class="flex-1 min-w-0 pr-1 cursor-pointer group active:opacity-75 transition-opacity"
                                          @click="openDetail({
@@ -222,7 +216,8 @@
                                              minimum_stock: {{ $item->minimum_stock }},
                                              unit: '{{ addslashes($item->unit) }}',
                                              category: '{{ addslashes($item->category) }}',
-                                             description: '{{ addslashes($item->description ?? '') }}'
+                                             description: '{{ addslashes($item->description ?? '') }}',
+                                             image_url: '{{ $item->image_url }}'
                                          })">
                                         <div class="flex items-center gap-1.5">
                                             <h3 class="text-sm sm:text-base font-bold text-ink group-hover:text-brand transition-colors leading-snug line-clamp-2">
@@ -479,6 +474,8 @@
     <x-bottom-sheet show="detailOpen" title="Detail Menu">
         <template x-if="detailItem">
             <div class="space-y-4">
+                <img :src="detailItem.image_url" :alt="'Foto ' + detailItem.name" class="w-full aspect-[16/9] object-cover rounded-xl border border-line bg-canvas">
+
                 <div>
                     <div class="flex items-center gap-2 mb-1.5">
                         <span class="text-2xs font-bold text-brand bg-brand-wash px-2.5 py-0.5 rounded-full border border-line uppercase tracking-wider" 

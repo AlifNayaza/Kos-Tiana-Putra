@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" role="img" aria-label="Ilustrasi minuman">
+  <!-- Latar -->
+  <rect width="800" height="450" fill="#e8eef7"/>
+  <rect y="360" width="800" height="90" fill="#c9d6e8"/>
+  <g fill="#d6e1f0">
+    <circle cx="90" cy="80" r="30"/>
+    <circle cx="720" cy="90" r="22"/>
+    <circle cx="660" cy="40" r="12"/>
+  </g>
+
+  <!-- Gelas es teh / es susu -->
+  <ellipse cx="300" cy="372" rx="100" ry="14" fill="#a9bbd6"/>
+  <path d="M210 120 h180 l-20 250 q-2 12 -14 12 h-112 q-12 0 -14 -12 Z" fill="#fffefb" opacity="0.55"/>
+  <path d="M220 190 h160 l-14 176 q-2 10 -12 10 h-108 q-10 0 -12 -10 Z" fill="#b5651d"/>
+  <path d="M220 190 h160 l-3 34 h-154 Z" fill="#d38a3c"/>
+  <!-- Es batu -->
+  <g fill="#fffefb" opacity="0.75">
+    <rect x="246" y="206" width="40" height="40" rx="6" transform="rotate(-12 266 226)"/>
+    <rect x="304" y="222" width="38" height="38" rx="6" transform="rotate(14 323 241)"/>
+    <rect x="270" y="262" width="36" height="36" rx="6" transform="rotate(6 288 280)"/>
+  </g>
+  <!-- Sedotan -->
+  <path d="M330 300 L372 70 h22" stroke="#a3341c" stroke-width="12" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Irisan jeruk -->
+  <circle cx="212" cy="140" r="34" fill="#f2b632"/>
+  <circle cx="212" cy="140" r="26" fill="#f8d77a"/>
+  <g stroke="#f2b632" stroke-width="3">
+    <line x1="212" y1="114" x2="212" y2="166"/>
+    <line x1="186" y1="140" x2="238" y2="140"/>
+    <line x1="194" y1="122" x2="230" y2="158"/>
+    <line x1="230" y1="122" x2="194" y2="158"/>
+  </g>
+  <path d="M210 120 h180 l-2 22 h-176 Z" fill="#fffefb" opacity="0.4"/>
+
+  <!-- Cangkir kopi -->
+  <ellipse cx="560" cy="374" rx="120" ry="16" fill="#a9bbd6"/>
+  <ellipse cx="560" cy="362" rx="110" ry="20" fill="#fffefb"/>
+  <path d="M480 250 h160 v60 q0 50 -80 50 q-80 0 -80 -50 Z" fill="#006059"/>
+  <path d="M640 266 q46 0 46 30 q0 30 -46 30" stroke="#006059" stroke-width="14" fill="none"/>
+  <ellipse cx="560" cy="250" rx="80" ry="14" fill="#004540"/>
+  <ellipse cx="560" cy="250" rx="70" ry="10" fill="#6b3f1d"/>
+  <path d="M540 248 q20 -8 40 0 q-20 6 -40 0 Z" fill="#c98a2b" opacity="0.8"/>
+  <!-- Uap -->
+  <g stroke="#9fb1cc" stroke-width="7" fill="none" stroke-linecap="round">
+    <path d="M530 220 q-14 -20 0 -40 t0 -40"/>
+    <path d="M565 214 q-14 -20 0 -40 t0 -40"/>
+    <path d="M600 220 q-14 -20 0 -40 t0 -40"/>
+  </g>
+</svg>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Room;
 use App\Models\TenantProfile;
 use App\Models\User;
+use App\Support\ImageUpload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -63,7 +64,10 @@ class RoomTenantController extends Controller
             'status'        => ['required', 'in:tersedia,terisi,perbaikan'],
             'size'          => ['nullable', 'string', 'max:50'],
             'description'   => ['nullable', 'string'],
+            'image'         => ImageUpload::rules(),
         ]);
+
+        $validated['image'] = ImageUpload::resolve($request, 'rooms', null);
 
         Room::create($validated);
 
@@ -85,7 +89,10 @@ class RoomTenantController extends Controller
             'status'        => ['required', 'in:tersedia,terisi,perbaikan'],
             'size'          => ['nullable', 'string', 'max:50'],
             'description'   => ['nullable', 'string'],
+            'image'         => ImageUpload::rules(),
         ]);
+
+        $validated['image'] = ImageUpload::resolve($request, 'rooms', $room->image);
 
         $room->update($validated);
 
@@ -111,6 +118,7 @@ class RoomTenantController extends Controller
 
         $roomNumber = $room->room_number;
         $room->delete();
+        ImageUpload::delete($room->image);
 
         return redirect()->route('pengelola.kamar.index')
             ->with('success', "Kamar {$roomNumber} telah berhasil dihapus dari sistem.");

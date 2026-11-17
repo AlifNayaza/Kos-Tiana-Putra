@@ -16,7 +16,11 @@
         size: '3x3 m',
         status: 'tersedia',
         facilities: 'Kasur Busa, Lemari Pakaian, Meja Belajar, WiFi',
-        description: ''
+        description: '',
+        image_url: '',
+        has_image: false,
+        preview: null,
+        remove_image: false
     },
     openCreate() {
         this.isEdit = false;
@@ -29,7 +33,11 @@
             size: '3x3 m',
             status: 'tersedia',
             facilities: 'Kasur Busa, Lemari Pakaian, Meja Belajar, WiFi',
-            description: ''
+            description: '',
+            image_url: '',
+            has_image: false,
+            preview: null,
+            remove_image: false
         };
         this.modalOpen = true;
     },
@@ -44,7 +52,11 @@
             size: room.size || '',
             status: room.status,
             facilities: room.facilities || '',
-            description: room.description || ''
+            description: room.description || '',
+            image_url: room.image_url,
+            has_image: Boolean(room.image),
+            preview: null,
+            remove_image: false
         };
         this.modalOpen = true;
     }
@@ -146,8 +158,13 @@
                 };
                 $tenant = $room->activeTenantProfile;
             @endphp
-            <div class="bg-surface rounded-2xl border border-line shadow-xs p-5 flex flex-col justify-between hover:border-brand/40 transition-colors">
+            <div class="bg-surface rounded-2xl border border-line shadow-xs p-5 flex flex-col justify-between hover:border-brand/40 transition-colors overflow-hidden">
                 <div>
+                    <!-- Foto Kamar -->
+                    <div class="-mx-5 -mt-5 mb-4 aspect-[16/9] bg-canvas border-b border-line">
+                        <img src="{{ $room->image_url }}" alt="Foto {{ $room->room_number }}" loading="lazy" class="w-full h-full object-cover">
+                    </div>
+
                     <!-- Card Top Header -->
                     <div class="flex items-start justify-between">
                         <div>
@@ -263,7 +280,7 @@
                     </button>
                 </div>
 
-                <form :action="editUrl" method="POST" class="mt-4 space-y-4" data-restore="kamar" data-open-var="modalOpen" data-url-var="editUrl" data-edit-var="isEdit">
+                <form :action="editUrl" method="POST" enctype="multipart/form-data" class="mt-4 space-y-4" data-restore="kamar" data-open-var="modalOpen" data-url-var="editUrl" data-edit-var="isEdit">
                     @csrf
                     <input type="hidden" name="_restore" value="kamar">
                     <input type="hidden" name="_action" :value="editUrl">
@@ -339,6 +356,8 @@
                                class="w-full text-xs rounded-xl border border-line bg-surface text-ink focus:border-brand focus:ring-2 focus:ring-brand-wash focus:outline-none p-2.5">
                         <x-field-error name="description" />
                     </div>
+
+                    <x-image-input form="roomForm" label="Foto Kamar" placeholder="'{{ asset('images/placeholders/kamar.svg') }}'" />
 
                     <div class="pt-4 border-t border-line flex items-center justify-end space-x-3">
                         <button type="button" @click="modalOpen = false" 

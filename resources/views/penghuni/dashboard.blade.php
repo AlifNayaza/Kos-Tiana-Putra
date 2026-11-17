@@ -295,6 +295,10 @@
     <div class="lg:col-start-2 lg:row-start-2">
         <div class="bg-surface rounded-xl border border-line p-4 sm:p-5 text-ink shadow-xs space-y-3">
             <span class="text-2xs font-bold text-ink-faint uppercase tracking-wider">Informasi Hunian</span>
+
+            @if($room)
+                <img src="{{ $room->image_url }}" alt="Foto {{ $room->room_number }}" loading="lazy" class="w-full aspect-[16/9] object-cover rounded-lg border border-line bg-canvas">
+            @endif
             
             <!-- Satu Baris Info Kamar -->
             <div class="text-xs text-ink font-medium leading-relaxed">
@@ -353,8 +357,9 @@
                             changeGalonSheet = false;
                         "
                         :class="selectedGalonId === {{ $galon->id }} ? 'border-brand bg-brand-wash' : 'border-line hover:border-ink-faint bg-surface'"
-                        class="w-full min-h-[44px] p-3 rounded-xl border text-left flex items-center justify-between transition-colors">
-                    <div>
+                        class="w-full min-h-[44px] p-3 rounded-xl border text-left flex items-center justify-between gap-3 transition-colors">
+                    <img src="{{ $galon->image_url }}" alt="" loading="lazy" class="w-11 h-11 rounded-lg object-cover border border-line bg-canvas flex-shrink-0">
+                    <div class="flex-1 min-w-0">
                         <p class="text-xs font-bold text-ink">{{ $galon->name }}</p>
                         <p class="text-2xs text-ink-soft tabular-nums">{{ $galon->formatted_price }}</p>
                     </div>

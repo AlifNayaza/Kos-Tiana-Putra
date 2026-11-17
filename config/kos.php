@@ -69,5 +69,10 @@ return [
         // Disk privat (tidak dapat diakses langsung lewat URL publik).
         'proof_disk' => 'local',
         'proof_dir'  => 'payment_proofs',
+
+        // Foto kamar & menu katalog: disk publik agar bisa tampil langsung (butuh `php artisan storage:link`).
+        'image_disk'   => 'public',
+        'image_mimes'  => ['jpg', 'jpeg', 'png', 'webp'],
+        'image_max_kb' => 2048,
     ],
 ];
